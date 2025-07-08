@@ -1,0 +1,1 @@
+# Shelly-MQTT-Discovery-Script
