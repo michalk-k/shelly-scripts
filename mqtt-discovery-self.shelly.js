@@ -4,8 +4,8 @@ let CONFIG = {
   report_ip: true
 };
 
-const COMPONENT_TYPES = ["switch", "pm1"];
-const SUPPORTED_ATTRS = ["apower", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output"];
+const COMPONENT_TYPES = ["switch", "pm1", "wifi"];
+const SUPPORTED_ATTRS = ["apower", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi"];
 
 const DEVCLASSES = {
   "apower": "power",
@@ -16,22 +16,9 @@ const DEVCLASSES = {
   "aenergy": "energy",
   "ret_aenergy": "energy",
   "temperature": "temperature",
-  "output": "switch" // possible none, switch, outlet
+  "output": "switch", // possible none, switch, outlet
+  "rssi": "signal_strength"
 }
-
-// Used for unique id generation
-// Modify with awarences about breaking changes
-// const ALIASES = {
-//   "apower": "power",
-//   "voltage": "voltage",
-//   "freq": "frequency",
-//   "current": "current",
-//   "pf": "power_factor",
-//   "aenergy": "energy",
-//   "ret_aenergy": "ret_energy",
-//   "temperature": "temperature",
-//   "output": "switch"
-// }
 
 const NAMES = {
   "apower": "Active Power",
@@ -42,7 +29,8 @@ const NAMES = {
   "aenergy": "Active Energy",
   "ret_aenergy": "Returned Active Energy",
   "temperature": "Temperature",
-  "output": "Switch"
+  "output": "Switch",
+  "rssi": "RSSI"
 }
 
 const UNITS = {
@@ -53,7 +41,8 @@ const UNITS = {
   "aenergy": "Wh",
   "ret_aenergy": "Wh",
   "tC": "°C",
-  "tF": "°F"
+  "tF": "°F",
+  "rssi": "dBm"
 }
 
 const DOMAINS = {
@@ -68,7 +57,10 @@ const DOMAINS = {
   "state": "binary_sensor",
   "output": "switch",
   "pf": "sensor",
+  "rssi": "sensor"
 }
+
+const CAT_DIAGNOSTIC = ["rssi"];
 
 /**
  * Normalize MAC address removing : and - characters, and making the rest lowercase
@@ -100,8 +92,8 @@ function discoveryDevice(deviceInfo) {
   device.mf = "Shelly"
   device.mdl = "Shelly " + deviceInfo.app;
   device.mdl_id = deviceInfo.model;
-  device.sw_version = deviceInfo.ver;
-  device.hw_version = "gen " + deviceInfo.gen;
+  device.sw = deviceInfo.ver;
+  device.hw = "gen " + deviceInfo.gen;
   
   if (CONFIG.report_ip) {
     device.cu = "http://" + Shelly.getComponentStatus("wifi").sta_ip;
@@ -117,13 +109,13 @@ function discoveryDevice(deviceInfo) {
  * @param {int} id Name of object type. Mostly it will be borrowed for entity name
  * @return {<Object>} Object with data for publishing to MQTT
  */
-function discoveryEntity(topic, attr, id, mac) {
+function discoveryEntity(topic, devsubt, attr, id, mac) {
   let pload = {};
   let domain = getDomain(attr);
 
   pload["name"] = getName(attr, id);
   pload["uniq_id"] = getUniqueId(mac, attr, id);
-  pload["stat_t"] = topic;
+  pload["stat_t"] = topic + "/status/" + devsubt;
   pload["val_tpl"] = getValTpl(attr);
   pload.dev_cla = getDeviceClass(attr);
   
@@ -135,13 +127,17 @@ function discoveryEntity(topic, attr, id, mac) {
 
   switch (domain) {
     case "switch":
-      pload["cmd_t"] = "shellies/blutest/rpc";
+      pload["cmd_t"] = topic + "/command/" + devsubt;
       pload["pl_on"] = "on";
       pload["pl_off"] = "off";
       break;
     case "sensor":
       pload["unit_of_meas"] = getUnits(attr);
       break;
+  }
+
+  if (CAT_DIAGNOSTIC.indexOf(attr) != -1) {
+    pload["ent_cat"] = "diagnostic";
   }
 
   // let subt =getAlias(attr, id);
@@ -160,11 +156,11 @@ function discoveryEntity(topic, attr, id, mac) {
  * @param {Object} data - The input data object containing supported attributes.
  * @param {string} mac - The MAC address used in unique IDs.
  */
-function discoveryItems(result, topic, data, mac) {
+function discoveryItems(result, topic, devsubt, data, mac) {
 
   for (let attr in data) {
     if (SUPPORTED_ATTRS.indexOf(attr) == -1) continue;
-    let d = discoveryEntity(topic, attr, data.id, mac);
+    let d = discoveryEntity(topic, devsubt, attr, data.id, mac);
     result.push(d);
   }
 
@@ -172,46 +168,74 @@ function discoveryItems(result, topic, data, mac) {
 
 
 function mqttreport() {
-
   let mqttConfig = Shelly.getComponentConfig("mqtt");
-
-  let data = {};
   let ploads = [];
-  var deviceInfo = Shelly.getDeviceInfo();
+  let deviceInfo = Shelly.getDeviceInfo();
   deviceInfo.mac = "B8D61A89XXXX"
   const macaddr = normalizeMacAddress(deviceInfo.mac);
   const device = discoveryDevice(deviceInfo);
+  const mqtt_topic = mqttConfig.topic_prefix;
+  // Free memory as soon as possible
+  deviceInfo = null;
+  mqttConfig = null;
+  let status;
 
   for (let t = 0; t < COMPONENT_TYPES.length; t++) {
     let comptype = COMPONENT_TYPES[t];
 
     // create data for single components
-    let status = Shelly.getComponentStatus(comptype);
+    status = Shelly.getComponentStatus(comptype);
 
     if (status !== null) {
-      discoveryItems(ploads, mqttConfig.topic_prefix + "/status/" + comptype, status, macaddr, null);
+      discoveryItems(ploads, mqtt_topic, comptype, status, macaddr);
+      // Free status after use
+      status = null;
       continue;
     }
+  }
+
+  let discoveryTopic;
+  for (let i = 0; i < ploads.length; i++) {
+    ploads[i].data.device = device;
+    discoveryTopic = CONFIG.discovery_topic + ploads[i].domain + "/" + macaddr + "/" + ploads[i].subtopic + "/config";
+    MQTT.publish(discoveryTopic, JSON.stringify(ploads[i].data), 1, true);
+    // Free each pload after publish
+    ploads[i] = null;
+  }
+  discoveryTopic = null;
+
+  ploads = null;
+  ploads = [];
+  for (let t = 0; t < COMPONENT_TYPES.length; t++) {
+    let comptype = COMPONENT_TYPES[t];
 
     // create data for multi-components like switch:0, switch:1 etc
     let index = 0;
+    let id;
     while (true) {
-      let id = comptype + ":" + index;
-      let status = Shelly.getComponentStatus(id);
+      id = comptype + ":" + index;
+      status = Shelly.getComponentStatus(id);
 
       if (status === null) break;
 
-      discoveryItems(ploads, mqttConfig.topic_prefix + "/status/" + id, status, macaddr);
+      discoveryItems(ploads, mqtt_topic, id, status, macaddr);
+      // Free status after use
+      status = null;
       index++;
     }
   }
 
+  let discoveryTopic;
   for (let i = 0; i < ploads.length; i++) {
     ploads[i].data.device = device;
-    let discoveryTopic = CONFIG.discovery_topic + ploads[i].domain + "/" + macaddr + "/" + ploads[i].subtopic + "/config";
-
+    discoveryTopic = CONFIG.discovery_topic + ploads[i].domain + "/" + macaddr + "/" + ploads[i].subtopic + "/config";
     MQTT.publish(discoveryTopic, JSON.stringify(ploads[i].data), 1, true);
+    // Free each pload after publish
+    ploads[i] = null;
   }
+  // Free ploads array
+  ploads = null;
+  discoveryTopic = null;
 }
 
 function getValTpl(attr) {
@@ -231,14 +255,14 @@ function getUniqueId(mac, attr, id) {
   let ret;
 
   if (NAMES[attr] === undefined) ret = attr;
-  else if (id !== null) ret = NAMES[attr] + "_" + (id+1);
+  else if (id !== undefined) ret = NAMES[attr] + "_" + (id+1);
   else ret = NAMES[attr];
 
   return mac + "_" + ret.toLowerCase().split(" ").join("_");
 }
 
 function getSubTopic(attr, id) {
-  if (id === null) return "status/" + attr;
+  if (id !== undefined) return "status/" + attr;
   return "status/" + attr + ":" + id;
 }
 
@@ -250,15 +274,9 @@ function getUnits(attr) {
 
 function getName(attr, id) {
   if (NAMES[attr] === undefined) return attr;
-  if (id !== null) return NAMES[attr] + " " + (id+1);
+  if (id !== undefined) return NAMES[attr] + " " + (id+1);
   return NAMES[attr];
 }
-
-// function getAlias(attr, id) {
-//   if (ALIASES[attr] === undefined) return attr;
-//   if (id !== null) return ALIASES[attr] + "_" + (id+1);
-//   return ALIASES[attr];
-// }
 
 function getDeviceClass(attr) {
   if (DEVCLASSES[attr] === undefined) return null;
@@ -272,3 +290,16 @@ function getDomain(attr) {
 
 
 mqttreport();
+
+function reportWifiToMQTT() {
+  let mqttConfig = Shelly.getComponentConfig("mqtt");
+  let wifiConfig = Shelly.getComponentStatus("wifi");
+
+  MQTT.publish(mqttConfig.topic_prefix + "/status/wifi", JSON.stringify(wifiConfig), 1, false);
+  // Free memory
+  mqttConfig = null;
+  wifiConfig = null;
+}
+
+reportWifiToMQTT();
+let timer_handle = Timer.set(60000, true, reportWifiToMQTT, null);
