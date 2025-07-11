@@ -1,11 +1,11 @@
 let CONFIG = {
   debug: true,
-  discovery_topic: "homeassistant/",
+  discovery_topic: "homeassistant_test/",
   report_ip: true
 };
 
-const COMPONENT_TYPES = ["switch", "pm1", "wifi"];
-const SUPPORTED_ATTRS = ["apower", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi"];
+const COMPONENT_TYPES = ["switch"];
+const SUPPORTED_ATTRS = ["apower", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature"];
 
 const DEVCLASSES = {
   "apower": "power",
@@ -16,8 +16,9 @@ const DEVCLASSES = {
   "aenergy": "energy",
   "ret_aenergy": "energy",
   "temperature": "temperature",
-  "output": "switch", // possible none, switch, outlet
-  "rssi": "signal_strength"
+  "switch": "switch", // possible none, switch, outlet
+  "rssi": "signal_strength",
+  // light matches domain name, not here to save memory
 }
 
 const NAMES = {
@@ -29,8 +30,9 @@ const NAMES = {
   "aenergy": "Active Energy",
   "ret_aenergy": "Returned Active Energy",
   "temperature": "Temperature",
-  "output": "Switch",
-  "rssi": "RSSI"
+  "switch": "Switch",
+  "rssi": "RSSI",
+  "light": "Light",
 }
 
 const UNITS = {
@@ -55,12 +57,15 @@ const DOMAINS = {
   "tC": "sensor",
   "tF": "sensor",
   "state": "binary_sensor",
-  "output": "switch",
   "pf": "sensor",
-  "rssi": "sensor"
+  "rssi": "sensor",
+  "temperature": "sensor"
+  // switch and light matches domain name, not here to save memory
 }
 
-const CAT_DIAGNOSTIC = ["rssi"];
+const CAT_DIAGNOSTIC = ["rssi", "temperature"];
+
+const DISABLED_ENTS = ["pf"];
 
 /**
  * Normalize MAC address removing : and - characters, and making the rest lowercase
@@ -109,15 +114,23 @@ function discoveryDevice(deviceInfo) {
  * @param {int} id Name of object type. Mostly it will be borrowed for entity name
  * @return {<Object>} Object with data for publishing to MQTT
  */
-function discoveryEntity(topic, devsubt, attr, id, mac) {
+function discoveryEntity(topic, attr, data, mac) {
   let pload = {};
-  let domain = getDomain(attr);
+  let attr_orig = attr;
+  
+  if (attr == "output") {
+    if (data.altdomain) attr = data.altdomain;
+    else attr = data.scomp
+  }
 
-  pload["name"] = getName(attr, id);
-  pload["uniq_id"] = getUniqueId(mac, attr, id);
-  pload["stat_t"] = topic + "/status/" + devsubt;
-  pload["val_tpl"] = getValTpl(attr);
-  pload.dev_cla = getDeviceClass(attr);
+  let domain = getDomain(attr, data);
+  
+
+  pload["name"] = getName(attr, data);
+  pload["uniq_id"] = getUniqueId(mac, attr_orig, data);
+  pload["stat_t"] = topic + "/status/" + data.stopic;
+  pload["val_tpl"] = getValTpl(attr_orig);
+  pload.dev_cla = getDeviceClass(attr, data);
   
   if (pload.dev_cla == "energy") {
     pload["stat_cla"] = "total_increasing";
@@ -127,7 +140,8 @@ function discoveryEntity(topic, devsubt, attr, id, mac) {
 
   switch (domain) {
     case "switch":
-      pload["cmd_t"] = topic + "/command/" + devsubt;
+    case "light":
+      pload["cmd_t"] = topic + "/command/" + data.stopic;
       pload["pl_on"] = "on";
       pload["pl_off"] = "off";
       break;
@@ -140,8 +154,12 @@ function discoveryEntity(topic, devsubt, attr, id, mac) {
     pload["ent_cat"] = "diagnostic";
   }
 
+  if (DISABLED_ENTS.indexOf(attr) != -1) {
+    pload["en"] = false;
+  }
+
   // let subt =getAlias(attr, id);
-  return { "domain": domain, "subtopic": getName(attr, id).toLowerCase().split(" ").join("_"), "data": pload }
+  return { "domain": domain, "subtopic": getName(attr, data).toLowerCase().split(" ").join("_"), "data": pload }
 }
 
 
@@ -156,11 +174,11 @@ function discoveryEntity(topic, devsubt, attr, id, mac) {
  * @param {Object} data - The input data object containing supported attributes.
  * @param {string} mac - The MAC address used in unique IDs.
  */
-function discoveryItems(result, topic, devsubt, data, mac) {
+function discoveryItems(result, topic, data, mac) {
 
   for (let attr in data) {
     if (SUPPORTED_ATTRS.indexOf(attr) == -1) continue;
-    let d = discoveryEntity(topic, devsubt, attr, data.id, mac);
+    let d = discoveryEntity(topic, attr, data, mac);
     result.push(d);
   }
 
@@ -169,73 +187,121 @@ function discoveryItems(result, topic, devsubt, data, mac) {
 
 function mqttreport() {
   let mqttConfig = Shelly.getComponentConfig("mqtt");
+  let uidata = Shelly.getComponentConfig("sys").ui_data;
+  
   let ploads = [];
   let deviceInfo = Shelly.getDeviceInfo();
   deviceInfo.mac = "B8D61A89XXXX"
   const macaddr = normalizeMacAddress(deviceInfo.mac);
-  const device = discoveryDevice(deviceInfo);
+  let device = discoveryDevice(deviceInfo);
+  let idents = {"ids": device.ids};
   const mqtt_topic = mqttConfig.topic_prefix;
   // Free memory as soon as possible
   deviceInfo = null;
   mqttConfig = null;
-  let status;
+  let data;
+  let discoveryTopic;
+
+  let dummyentity = {
+    "device": device,
+    "name": "dummy",
+    "uniq_id":"temp01ae_t",
+    "en": false,
+    "qos": 2,
+    "dev": "sensor",
+    "stat_t": mqtt_topic,
+  }
+
+  let str = JSON.stringify(dummyentity)
+  dummyentity = null;
+
+  discoveryTopic = CONFIG.discovery_topic + "sensor" + "/" + macaddr + "/" + "dummy" + "/config";
+  MQTT.publish(discoveryTopic, JSON.stringify(str), 0, true);
+
+  // return;
+  device = null;
 
   for (let t = 0; t < COMPONENT_TYPES.length; t++) {
     let comptype = COMPONENT_TYPES[t];
 
     // create data for single components
-    status = Shelly.getComponentStatus(comptype);
+    data = Shelly.getComponentStatus(comptype);
 
-    if (status !== null) {
-      discoveryItems(ploads, mqtt_topic, comptype, status, macaddr);
+    if (data !== null) {
+      data.scomp = comptype;
+      data.stopic = comptype;
+      discoveryItems(ploads, mqtt_topic, data, macaddr);
       // Free status after use
-      status = null;
+      data = null;
       continue;
     }
   }
 
-  let discoveryTopic;
+  
   for (let i = 0; i < ploads.length; i++) {
-    ploads[i].data.device = device;
+    ploads[i].data.device = idents;
     discoveryTopic = CONFIG.discovery_topic + ploads[i].domain + "/" + macaddr + "/" + ploads[i].subtopic + "/config";
-    MQTT.publish(discoveryTopic, JSON.stringify(ploads[i].data), 1, true);
+    str = JSON.stringify(ploads[i].data);
+    MQTT.publish(discoveryTopic, str, 0, true);
     // Free each pload after publish
+    str= null;
     ploads[i] = null;
   }
   discoveryTopic = null;
-
   ploads = null;
-  ploads = [];
+
+  
   for (let t = 0; t < COMPONENT_TYPES.length; t++) {
+    ploads = [];
     let comptype = COMPONENT_TYPES[t];
 
     // create data for multi-components like switch:0, switch:1 etc
     let index = 0;
     let id;
     while (true) {
+      
       id = comptype + ":" + index;
-      status = Shelly.getComponentStatus(id);
+      data = Shelly.getComponentStatus(id);
+      
+      if (data === null) break;
 
-      if (status === null) break;
+      data.scomp = comptype;
+      data.stopic = id;
+      data.name = Shelly.getComponentConfig(id).name;
+      data.altdomain = uidata.consumption_types[index];
+      ploads = [];
+      discoveryItems(ploads, mqtt_topic, data, macaddr);
 
-      discoveryItems(ploads, mqtt_topic, id, status, macaddr);
-      // Free status after use
-      status = null;
-      index++;
+
+      for (let i = 0; i < ploads.length; i++) {
+      ploads[i].data.device = idents;
+      discoveryTopic = CONFIG.discovery_topic + ploads[i].domain + "/" + macaddr + "/" + ploads[i].subtopic + "/config";
+      str = JSON.stringify(ploads[i].data);
+      MQTT.publish(discoveryTopic, JSON.stringify(ploads[i].data), 0, true);
+
+      // Free each pload after publish
+      str = null;
+      ploads[i] = null;
     }
+    ploads = null;
+    // Free status after use
+    data = null;
+    index++;
   }
 
-  let discoveryTopic;
-  for (let i = 0; i < ploads.length; i++) {
-    ploads[i].data.device = device;
-    discoveryTopic = CONFIG.discovery_topic + ploads[i].domain + "/" + macaddr + "/" + ploads[i].subtopic + "/config";
-    MQTT.publish(discoveryTopic, JSON.stringify(ploads[i].data), 1, true);
-    // Free each pload after publish
-    ploads[i] = null;
+
+    // for (let i = 0; i < ploads.length; i++) {
+    //   ploads[i].data.device = device;
+    //   discoveryTopic = CONFIG.discovery_topic + ploads[i].domain + "/" + macaddr + "/" + ploads[i].subtopic + "/config";
+    //   MQTT.publish(discoveryTopic, JSON.stringify(ploads[i].data), 1, true);
+
+    //   // Free each pload after publish
+    //   ploads[i] = null;
+    // }
+    // Free ploads array
+    ploads = null;
+    discoveryTopic = null;
   }
-  // Free ploads array
-  ploads = null;
-  discoveryTopic = null;
 }
 
 function getValTpl(attr) {
@@ -246,16 +312,33 @@ function getValTpl(attr) {
       return "{{ value_json." + attr + ".total }}";
     case "switch":
       return "{{ 'on' if value_json." + attr + " else 'off' }}";
+    case "tC":
+      return "{{ value_json." + attr + ".tC }}";
   }
 
   return "{{ value_json." + attr + " }}";
 }
 
-function getUniqueId(mac, attr, id) {
+function getName(attr, data) {
+
+  if ( data.name) {
+    return data.name;
+  }
+
+  let name;
+  if (NAMES.attr) name = NAMES.attr;
+  else name = attr;
+  
+  if (data.id !== undefined) name = name + "_" + (data.id+1);
+  
+  return name;
+}
+
+function getUniqueId(mac, attr, data) {
   let ret;
 
-  if (NAMES[attr] === undefined) ret = attr;
-  else if (id !== undefined) ret = NAMES[attr] + "_" + (id+1);
+  if (NAMES.attr) ret = NAMES.attr;
+  if (data.id !== undefined) ret = NAMES[attr] + "_" + (data.id+1);
   else ret = NAMES[attr];
 
   return mac + "_" + ret.toLowerCase().split(" ").join("_");
@@ -272,19 +355,13 @@ function getUnits(attr) {
   return UNITS[attr];
 }
 
-function getName(attr, id) {
-  if (NAMES[attr] === undefined) return attr;
-  if (id !== undefined) return NAMES[attr] + " " + (id+1);
-  return NAMES[attr];
-}
-
-function getDeviceClass(attr) {
-  if (DEVCLASSES[attr] === undefined) return null;
+function getDeviceClass(attr, data) {
+  if (DEVCLASSES[attr] === undefined) return attr;
   return DEVCLASSES[attr];
 }
 
-function getDomain(attr) {
-  if (DOMAINS[attr] === undefined) return null;
+function getDomain(attr, data) {
+  if (DOMAINS[attr] === undefined) return attr;
   return DOMAINS[attr];
 }
 
