@@ -179,7 +179,8 @@ function discoveryItems(result, topic, data, mac) {
   for (let attr in data) {
     if (SUPPORTED_ATTRS.indexOf(attr) == -1) continue;
     let d = discoveryEntity(topic, attr, data, mac);
-    result.push(d);
+    result.entities[d.data.uniq_id] = d;
+    //  push(d);
   }
 
 }
@@ -189,7 +190,7 @@ function mqttreport() {
   let mqttConfig = Shelly.getComponentConfig("mqtt");
   let uidata = Shelly.getComponentConfig("sys").ui_data;
   
-  let ploads = [];
+  // let ploads = [];
   let deviceInfo = Shelly.getDeviceInfo();
   deviceInfo.mac = "B8D61A89XXXX"
   const macaddr = normalizeMacAddress(deviceInfo.mac);
@@ -202,25 +203,26 @@ function mqttreport() {
   let data;
   let discoveryTopic;
 
-  let dummyentity = {
-    "device": device,
-    "name": "dummy",
-    "uniq_id":"temp01ae_t",
-    "en": false,
-    "qos": 2,
-    "dev": "sensor",
-    "stat_t": mqtt_topic,
-  }
+  // let dummyentity = {
+  //   "device": device,
+  //   "name": "dummy",
+  //   "uniq_id":"temp01ae_t",
+  //   "en": false,
+  //   "qos": 2,
+  //   "dev": "sensor",
+  //   "stat_t": mqtt_topic,
+  // }
 
-  let str = JSON.stringify(dummyentity)
-  dummyentity = null;
+  // let str = JSON.stringify(dummyentity)
+  // dummyentity = null;
 
-  discoveryTopic = CONFIG.discovery_topic + "sensor" + "/" + macaddr + "/" + "dummy" + "/config";
-  MQTT.publish(discoveryTopic, JSON.stringify(str), 0, true);
+  // discoveryTopic = CONFIG.discovery_topic + "sensor" + "/" + macaddr + "/" + "dummy" + "/config";
+  // MQTT.publish(discoveryTopic, JSON.stringify(str), 0, true);
 
   // return;
-  device = null;
+  // device = null;
 
+  device.entities = {};
   for (let t = 0; t < COMPONENT_TYPES.length; t++) {
     let comptype = COMPONENT_TYPES[t];
 
@@ -230,7 +232,7 @@ function mqttreport() {
     if (data !== null) {
       data.scomp = comptype;
       data.stopic = comptype;
-      discoveryItems(ploads, mqtt_topic, data, macaddr);
+      discoveryItems(device, mqtt_topic, data, macaddr);
       // Free status after use
       data = null;
       continue;
@@ -238,21 +240,21 @@ function mqttreport() {
   }
 
   
-  for (let i = 0; i < ploads.length; i++) {
-    ploads[i].data.device = idents;
-    discoveryTopic = CONFIG.discovery_topic + ploads[i].domain + "/" + macaddr + "/" + ploads[i].subtopic + "/config";
-    str = JSON.stringify(ploads[i].data);
-    MQTT.publish(discoveryTopic, str, 0, true);
-    // Free each pload after publish
-    str= null;
-    ploads[i] = null;
-  }
-  discoveryTopic = null;
-  ploads = null;
+  // for (let i = 0; i < ploads.length; i++) {
+  //   // ploads[i].data.device = idents;
+  //   discoveryTopic = CONFIG.discovery_topic + ploads[i].domain + "/" + macaddr + "/" + ploads[i].subtopic + "/config";
+  //   str = JSON.stringify(ploads[i].data);
+  //   MQTT.publish(discoveryTopic, str, 0, true);
+  //   // Free each pload after publish
+  //   str= null;
+  //   ploads[i] = null;
+  // }
+  // discoveryTopic = null;
+  // ploads = null;
 
   
   for (let t = 0; t < COMPONENT_TYPES.length; t++) {
-    ploads = [];
+    // ploads = [];
     let comptype = COMPONENT_TYPES[t];
 
     // create data for multi-components like switch:0, switch:1 etc
@@ -269,21 +271,10 @@ function mqttreport() {
       data.stopic = id;
       data.name = Shelly.getComponentConfig(id).name;
       data.altdomain = uidata.consumption_types[index];
-      ploads = [];
-      discoveryItems(ploads, mqtt_topic, data, macaddr);
 
+      discoveryItems(device, mqtt_topic, data, macaddr);
 
-      for (let i = 0; i < ploads.length; i++) {
-      ploads[i].data.device = idents;
-      discoveryTopic = CONFIG.discovery_topic + ploads[i].domain + "/" + macaddr + "/" + ploads[i].subtopic + "/config";
-      str = JSON.stringify(ploads[i].data);
-      MQTT.publish(discoveryTopic, JSON.stringify(ploads[i].data), 0, true);
-
-      // Free each pload after publish
-      str = null;
-      ploads[i] = null;
-    }
-    ploads = null;
+    // ploads = null;
     // Free status after use
     data = null;
     index++;
@@ -299,9 +290,16 @@ function mqttreport() {
     //   ploads[i] = null;
     // }
     // Free ploads array
-    ploads = null;
-    discoveryTopic = null;
+    
   }
+
+  // discoveryTopic = CONFIG.discovery_topic + "testdata";
+  devdata = JSON.stringify(device);
+  // device = null;
+  
+  // MQTT.publish(discoveryTopic, device, 1, true);
+  ploads = null;
+  discoveryTopic = null;
 }
 
 function getValTpl(attr) {
