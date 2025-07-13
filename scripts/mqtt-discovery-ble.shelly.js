@@ -286,7 +286,7 @@ function extractBTHomeData(payload) {
 
 /**
  * Converts integer value of button event to textual representation
- * @param {integer} intval
+ * @param {number} intval
  * @returns {string}
  */
 function convertIntToButtonEvent(intval) {
@@ -334,7 +334,7 @@ function getTopicName(resarray) {
  * via_device is set to Shelly address the script is run on.
  *
  * @param address {string} - normalized already mac address of the BLE device.
- * @returns {<Object>} device object structured for MQTT discovery
+ * @returns {Object} device object structured for MQTT discovery
  */
 function discoveryDevice(address) {
 
@@ -344,7 +344,7 @@ function discoveryDevice(address) {
     model = CONFIG.allowed_devices[address][1];
   }
 
-  device = {};
+  let device = {};
   device["name"] = address + (model === "" ? "" : "-" + model);
   device["ids"] = [address + ""];
   device["cns"] = [["mac", address]];
@@ -368,8 +368,8 @@ function discoveryDevice(address) {
  * @param {string} objident Object identifier used for preventing repeating discovery topic creation. Will be returned back in the result struct
  * @param {string} topic MQTT topic where data are reported to. Needed to include into Discovery definition
  * @param {string} objtype Name of object type. Mostly it will be borrowed for entity name
- * @param {integer} bt_index 0-based index of button. Used to identify a button being a member of a multi-button device
- * @return {<Object>} Object with data for publishing to MQTT
+ * @param {number} bt_index 0-based index of button. Used to identify a button being a member of a multi-button device
+ * @return {Object} Object with data for publishing to MQTT
  */
 function discoveryEntity(objident, topic, objtype, bt_index) {
 
@@ -510,7 +510,7 @@ function normalizeMacAddress(address) {
 /**
  * Determines whethere device identified by the `address` has to be processed or skipped.
  * @param {string} address Normalized form of MAC address
- * @returns {bool} False if device has to be skipped. Otherwise true.
+ * @returns {boolean} False if device has to be skipped. Otherwise true.
  */
 function allowDevices(address) {
   if (!CONFIG.filter_devices) return true;

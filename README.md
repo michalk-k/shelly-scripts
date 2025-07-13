@@ -45,7 +45,7 @@ By default **entity name** follows the tracked attribute function, for example: 
 
 If device channel has a custom name configured (as for example, `Output -> Name` in Shelly2PM), all related entity names gets name as follows: `Custom Name Function`, For example `Dryer Socket Frequency`. in this case the oridinal number of Shelly component is not appended.
 
-The **friendly_name** is created by Home Assistant from the device name and the entity name. It might look like `b8d6xxxxxxxx-Plus2PM Active Power 2` or `b8d6xxxxxxxx-Plus2PM Backlight`. Looks horrible, but once device name is changed to something meaningfull, ie AlcoveLight, the friendly name will turn into `AlcoveLight Active Power 2` or `AlcoveLight Backlight`.
+The **friendly_name** is created by Home Assistant from the device name and the entity name. It might look like `b8d6xxxxxxxx-Plus2PM Active Power 2` or `b8d6xxxxxxxx-Plus2PM Backlight`. Looks horrible, but once device name is changed to something meaningfull, ie AlcoveLight, the friendly name will turn into `AlcoveLight Active Power 2` or `AlcoveLight Backlight` respectively.
 
 The **unique_id** allways follows the pattern: `macaddress-function` or `macaddress-function-number`, for example `macaddress-rssi` or `b8d6xxxxxxxx_power_factor_1`. Unique id never changes and is not influenced by configuration settings.
 
@@ -60,4 +60,4 @@ Shelly devices allows to enter this information into `(Output Settings -> Consum
 
 > Currently only `light` as alternative device class is supported
 
-Note, that the change neither influences `unique_id`, `entity_id` or mqtt topic names. But it will change the display name of the entity.
+Note, that the change neither influences `unique_id`, `entity_id` or mqtt topic names. But it will change the `entity name` and `friendly name` of the entity.
