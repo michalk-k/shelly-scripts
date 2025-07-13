@@ -8,6 +8,9 @@ let CONFIG = {
 const COMPONENT_TYPES = ["switch", "pm1", "wifi"];
 const SUPPORTED_ATTRS = ["apower", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature"];
 
+const CAT_DIAGNOSTIC = ["rssi","temperature"];
+const DISABLED_ENTS = ["pf", "voltage", "freq", "current", "ret_aenergy"];
+
 const DEVCLASSES = {
   "apower": "power",
   "voltage": "voltage",
@@ -65,9 +68,6 @@ const DOMAINS = {
   // switch and light matches domain name, not here to save memory
 }
 
-const CAT_DIAGNOSTIC = ["rssi","temperature"];
-const DISABLED_ENTS = ["pf", "voltage", "freq", "current", "ret_aenergy"];
-
 /**
  * Normalize MAC address removing : and - characters, and making the rest lowercase
  * @param {string} address MAC address
@@ -106,7 +106,13 @@ function discoveryDevice(deviceInfo) {
   return device;
 }
 
-
+/**
+  * Returns a template for value extraction from MQTT message.
+  * The template is based on the attribute type and its device class.
+  *
+  * @param {string} attr - attribute name for which the template is to be created
+  * @returns {string} - template string for extracting value from MQTT message
+  */
 function getValTpl(attr) {
   let devclass = getDeviceClass(attr);
 
@@ -123,6 +129,15 @@ function getValTpl(attr) {
   return "{{ value_json." + attr + " }}";
 }
 
+/**
+ * Generates a unique identifier for the entity based on its MAC address, attribute, and index.
+ * The identifier is formatted as "mac_address_attribute_index", where attribute is Shelly component name, and index is optional.
+ * This way it never change even if you configure switch to be the light.
+ * @param {string} mac - MAC address of the device
+ * @param {string} attr - Attribute name of the entity
+ * @param {number} id - Index of the entity, used to differentiate entities with the same attribute
+ * @returns {string} - Unique identifier for the entity
+ */
 function getUniqueId(mac, attr, id) {
   let ret;
 
@@ -133,12 +148,25 @@ function getUniqueId(mac, attr, id) {
   return mac + "_" + ret.toLowerCase().split(" ").join("_");
 }
 
+/**
+ * Returns the unit of measurement for the given attribute.
+ * If the attribute is temperature, it appends the configured temperature unit (C or F).
+ * If the attribute is not recognized, it returns null.
+ * @param {string} attr - Attribute name for which the unit is to be retrieved
+ * @returns {string|null} - Unit of measurement for the attribute, or null if not recognized
+ */
 function getUnits(attr) {
   if (attr == "temperature") attr = "t" + CONFIG.temperature_unit;
   if (UNITS[attr] === undefined) return null;
   return UNITS[attr];
 }
 
+/**
+  * Returns a human-readable name for the entity based on its attribute and index.
+  * Determines a user-friendly name for the entity based on its type and available information.
+  * @param {Object} info - Object containing information about the entity, including its attribute, index, and name.
+  * @returns {string} - Human-readable name for the entity
+  */
 function getName(info) {
 
   if ( info.name && (info.attr == 'switch' || info.attr == 'light' )) {
@@ -155,11 +183,25 @@ function getName(info) {
   return name;
 }
 
+/** 
+ * Returns the device class for the given attribute.
+ * If the attribute is not recognized, it returns the attribute name itself.
+ * This is used to determine how the entity should be represented in Home Assistant.
+ * @param {string} attr - Attribute name for which the device class is to be retrieved
+ * @returns {string} - Device class for the attribute, or the attribute name if not recognized
+ */
 function getDeviceClass(attr) {
   if (DEVCLASSES[attr] === undefined) return attr;
   return DEVCLASSES[attr];
 }
 
+/**
+  * Returns the entity domain for the given attribute.   
+  * The domain is used to categorize the entity in Home Assistant.
+  * If the attribute is not recognized, it returns the attribute name itself.
+  * @param {string} attr - Attribute name for which the domain is to be retrieved
+  * @returns {string} - Domain for the attribute, or the attribute name if not recognized
+  */  
 function getDomain(attr) {
   if (DOMAINS[attr] !== undefined) return DOMAINS[attr];
   return attr;
@@ -277,7 +319,7 @@ function precollect() {
 }
 
 /**
- * Picks up an item, indexed by `report_arr_idx` from the `report_arr`, builds data out of it and publishes it to MQTT discovery topic.
+ * Processes the next entity in `report_arr` (using `report_arr_idx`), constructs its MQTT discovery payload, and publishes it to the appropriate MQTT discovery topic.
  * @returns 
  */
 function mqttreport() {
@@ -302,16 +344,21 @@ function mqttreport() {
   info.mac = macaddr;
 
   let data = discoveryEntity(devicemqtttopic, info);
-  data.data.dev = device;
   let discoveryTopic = CONFIG.discovery_topic + "/" + data.domain + "/" + macaddr + "/" + data.subtopic + "/config";
+  data.data.dev = device;
   MQTT.publish(discoveryTopic, JSON.stringify(data.data), 1, true);
 }
 
-
+// Initial precollection of entities to be reported
+// This will also set up a timer to publish one collected entity per second
 precollect();
 let schedurelmqtt = Timer.set(1000, true, mqttreport, null);
 
-
+/**
+ * Reports the WiFi configuration to MQTT.
+ * Publishes the WiFi status to the MQTT topic defined in the Shelly component configuration.
+ * The topic is constructed using the MQTT topic prefix and the "status/wifi" suffix.
+ */
 function reportWifiToMQTT() {
   let topic_prefix = Shelly.getComponentConfig("mqtt").topic_prefix;
   let wifiConfig = Shelly.getComponentStatus("wifi");
@@ -321,5 +368,7 @@ function reportWifiToMQTT() {
   wifiConfig = null;
 }
 
+// Initial call to report WiFi status
+// This will also set up a timer to report WiFi status every 60 seconds
 reportWifiToMQTT();
 let timer_handle = Timer.set(60000, true, reportWifiToMQTT, null);
