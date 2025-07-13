@@ -2,7 +2,10 @@
   {
     "fname": "scripts/mqtt-discovery-self.shelly.js",
     "title": "MQTT Discovery for self",
-    "description": "This script publishes MQTT Discovery data to MQTT configured in Shelly configuration. It registers all possible entities to Home Assistant without any hassle. It also adds reporting of Wifi component (including RSSI to device MQTT topic)"
+    "description": `This script publishes MQTT Discovery data to MQTT configured in Shelly configuration.
+It also adds reporting of Wifi component (including RSSI) to configured MQTT topic.
+
+It reports everything which might be subject of interest for home automation users. Some entities will be reported as disabled becuase of their limited usability.\n\nWhile it provides default naming for device and its entities, those names can be overwriten by custom values if configured in Shelly device.`
   },
   {
     "fname": "scripts/mqtt-discovery-ble.shelly.js",
