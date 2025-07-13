@@ -83,7 +83,7 @@ function normalizeMacAddress(address) {
  * Device name is built from its mac address and model name.
  *
  * @param deviceInfo {Object} - object with device information, including app, model, version, generation, etc.
- * @returns {<Object>} device object structured for MQTT discovery
+ * @returns {Object} device object structured for MQTT discovery
  */
 function discoveryDevice(deviceInfo) {
 
@@ -117,7 +117,7 @@ function getValTpl(attr) {
     case "light":
       return "{{ 'on' if value_json.output else 'off' }}";
     case "temperature":
-      return "{{ value_json." + attr + ".t" + temperature_unit + " }}";
+      return "{{ value_json." + attr + ".t" + CONFIG.temperature_unit + " }}";
   }
 
   return "{{ value_json." + attr + " }}";
@@ -134,7 +134,7 @@ function getUniqueId(mac, attr, id) {
 }
 
 function getUnits(attr) {
-  if (attr == "temperature") attr = "t" + temperature_unit;
+  if (attr == "temperature") attr = "t" + CONFIG.temperature_unit;
   if (UNITS[attr] === undefined) return null;
   return UNITS[attr];
 }
@@ -167,13 +167,11 @@ function getDomain(attr) {
 
 
 /**
- * Cretes and publishes discovery topic for single entity
+ * Builds data of single entity to be published to MQTT discovery
  * @param {string} topic Object identifier used for preventing repeating discovery topic creation. Will be returned back in the result struct
- * @param {string} attr MQTT topic where data are reported to. Needed to include into Discovery definition
- * @param {int} id Name of object type. Mostly it will be borrowed for entity name
- * @return {<Object>} Object with data for publishing to MQTT
+ * @param {Object} info Data needed to build the MQTT discovery obejct
+ * @returns {Object} Object with data for publishing to MQTT
  */
-
 function discoveryEntity(topic, info) {
   let attr_orig = info.attr;
   
@@ -235,7 +233,7 @@ let uidata = Shelly.getComponentConfig("sys").ui_data;
  */
 function precollect() {
   let deviceInfo = Shelly.getDeviceInfo();
-  deviceInfo.mac = "B8D61A89XXXX"
+  deviceInfo.mac = "B8:D6:1A:89:XX:XX";
   macaddr = normalizeMacAddress(deviceInfo.mac);
   device = discoveryDevice(deviceInfo);
   // Free memory as soon as possible
@@ -261,7 +259,7 @@ function precollect() {
       let index = 0;
       while (true) {
         
-        scomp = comptype + ":" + index;
+        let scomp = comptype + ":" + index;
         status = Shelly.getComponentStatus(scomp);
 
         if (status === null) break;
@@ -279,10 +277,11 @@ function precollect() {
 }
 
 /**
- * Picks up next item from the `report_arr`, buils data out of it and publishes it to MQTT discovery topic.
+ * Picks up an item, indexed by `report_arr_idx` from the `report_arr`, builds data out of it and publishes it to MQTT discovery topic.
  * @returns 
  */
 function mqttreport() {
+  let info;
 
   if (report_arr[report_arr_idx] ) {
     info = report_arr[report_arr_idx];
@@ -298,17 +297,14 @@ function mqttreport() {
     return;
   }
 
-
   info.name = Shelly.getComponentConfig(info.topic).name;
   info.altdomain = uidata.consumption_types[info.ix];
   info.mac = macaddr;
 
-
   let data = discoveryEntity(devicemqtttopic, info);
   data.data.dev = device;
-  discoveryTopic = CONFIG.discovery_topic + "/" + data.domain + "/" + macaddr + "/" + data.subtopic + "/config";
+  let discoveryTopic = CONFIG.discovery_topic + "/" + data.domain + "/" + macaddr + "/" + data.subtopic + "/config";
   MQTT.publish(discoveryTopic, JSON.stringify(data.data), 1, true);
-
 }
 
 
@@ -322,7 +318,6 @@ function reportWifiToMQTT() {
 
   MQTT.publish(topic_prefix + "/status/wifi", JSON.stringify(wifiConfig), 1, false);
   // Free memory
-  mqttConfig = null;
   wifiConfig = null;
 }
 
