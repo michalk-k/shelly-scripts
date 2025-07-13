@@ -1,11 +1,12 @@
 let CONFIG = {
   debug: true,
-  discovery_topic: "homeassistant/",
-  report_ip: true
+  discovery_topic: "homeassistant",
+  report_ip: true,
+  temperature_unit: "C" // C or F - Uppercase!!!
 };
 
 const COMPONENT_TYPES = ["switch", "pm1", "wifi"];
-const SUPPORTED_ATTRS = ["apower", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi"];
+const SUPPORTED_ATTRS = ["apower", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature"];
 
 const DEVCLASSES = {
   "apower": "power",
@@ -16,8 +17,9 @@ const DEVCLASSES = {
   "aenergy": "energy",
   "ret_aenergy": "energy",
   "temperature": "temperature",
-  "output": "switch", // possible none, switch, outlet
-  "rssi": "signal_strength"
+  "switch": "switch", // from docs: possible none, switch, outlet
+  "rssi": "signal_strength",
+  "light": "light"
 }
 
 const NAMES = {
@@ -30,7 +32,8 @@ const NAMES = {
   "ret_aenergy": "Returned Active Energy",
   "temperature": "Temperature",
   "output": "Switch",
-  "rssi": "RSSI"
+  "rssi": "RSSI",
+  "light": "Light"
 }
 
 const UNITS = {
@@ -57,10 +60,13 @@ const DOMAINS = {
   "state": "binary_sensor",
   "output": "switch",
   "pf": "sensor",
-  "rssi": "sensor"
+  "rssi": "sensor",
+  "temperature": "sensor"
+  // switch and light matches domain name, not here to save memory
 }
 
-const CAT_DIAGNOSTIC = ["rssi"];
+const CAT_DIAGNOSTIC = ["rssi","temperature"];
+const DISABLED_ENTS = ["pf", "voltage", "freq", "current", "ret_aenergy"];
 
 /**
  * Normalize MAC address removing : and - characters, and making the rest lowercase
@@ -74,11 +80,9 @@ function normalizeMacAddress(address) {
 /**
  * Function creates and returns a device data in format requierd by MQTT discovery.
  *
- * Manufacturer and model are retrieved from CONFIG.allowedMACs global variable.
- * Device name is built from its mac address and model name (if exists)
- * via_device is set to Shelly address the script is run on.
+ * Device name is built from its mac address and model name.
  *
- * @param address {string} - normalized already mac address of the BLE device.
+ * @param deviceInfo {Object} - object with device information, including app, model, version, generation, etc.
  * @returns {<Object>} device object structured for MQTT discovery
  */
 function discoveryDevice(deviceInfo) {
@@ -102,141 +106,6 @@ function discoveryDevice(deviceInfo) {
   return device;
 }
 
-/**
- * Cretes and publishes discovery topic for single entity
- * @param {string} topic Object identifier used for preventing repeating discovery topic creation. Will be returned back in the result struct
- * @param {string} attr MQTT topic where data are reported to. Needed to include into Discovery definition
- * @param {int} id Name of object type. Mostly it will be borrowed for entity name
- * @return {<Object>} Object with data for publishing to MQTT
- */
-function discoveryEntity(topic, devsubt, attr, id, mac) {
-  let pload = {};
-  let domain = getDomain(attr);
-
-  pload["name"] = getName(attr, id);
-  pload["uniq_id"] = getUniqueId(mac, attr, id);
-  pload["stat_t"] = topic + "/status/" + devsubt;
-  pload["val_tpl"] = getValTpl(attr);
-  pload.dev_cla = getDeviceClass(attr);
-  
-  if (pload.dev_cla == "energy") {
-    pload["stat_cla"] = "total_increasing";
-  } else if (domain == "sensor") {
-    pload["stat_cla"] = "measurement";
-  }
-
-  switch (domain) {
-    case "switch":
-      pload["cmd_t"] = topic + "/command/" + devsubt;
-      pload["pl_on"] = "on";
-      pload["pl_off"] = "off";
-      break;
-    case "sensor":
-      pload["unit_of_meas"] = getUnits(attr);
-      break;
-  }
-
-  if (CAT_DIAGNOSTIC.indexOf(attr) != -1) {
-    pload["ent_cat"] = "diagnostic";
-  }
-
-  // let subt =getAlias(attr, id);
-  return { "domain": domain, "subtopic": getName(attr, id).toLowerCase().split(" ").join("_"), "data": pload }
-}
-
-
-/**
- * Appends discovery entity definitions to the result array.
- *
- * Iterates over supported attributes in `data`, generates discovery
- * entities using `discoveryEntity`, and pushes them into `result`.
- *
- * @param {Array} result - [out] The array to which discovery items will be added.
- * @param {string} topic - The MQTT topic where data are found.
- * @param {Object} data - The input data object containing supported attributes.
- * @param {string} mac - The MAC address used in unique IDs.
- */
-function discoveryItems(result, topic, devsubt, data, mac) {
-
-  for (let attr in data) {
-    if (SUPPORTED_ATTRS.indexOf(attr) == -1) continue;
-    let d = discoveryEntity(topic, devsubt, attr, data.id, mac);
-    result.push(d);
-  }
-
-}
-
-
-function mqttreport() {
-  let mqttConfig = Shelly.getComponentConfig("mqtt");
-  let ploads = [];
-  let deviceInfo = Shelly.getDeviceInfo();
-  deviceInfo.mac = "B8D61A89XXXX"
-  const macaddr = normalizeMacAddress(deviceInfo.mac);
-  const device = discoveryDevice(deviceInfo);
-  const mqtt_topic = mqttConfig.topic_prefix;
-  // Free memory as soon as possible
-  deviceInfo = null;
-  mqttConfig = null;
-  let status;
-
-  for (let t = 0; t < COMPONENT_TYPES.length; t++) {
-    let comptype = COMPONENT_TYPES[t];
-
-    // create data for single components
-    status = Shelly.getComponentStatus(comptype);
-
-    if (status !== null) {
-      discoveryItems(ploads, mqtt_topic, comptype, status, macaddr);
-      // Free status after use
-      status = null;
-      continue;
-    }
-  }
-
-  let discoveryTopic;
-  for (let i = 0; i < ploads.length; i++) {
-    ploads[i].data.device = device;
-    discoveryTopic = CONFIG.discovery_topic + ploads[i].domain + "/" + macaddr + "/" + ploads[i].subtopic + "/config";
-    MQTT.publish(discoveryTopic, JSON.stringify(ploads[i].data), 1, true);
-    // Free each pload after publish
-    ploads[i] = null;
-  }
-  discoveryTopic = null;
-
-  ploads = null;
-  ploads = [];
-  for (let t = 0; t < COMPONENT_TYPES.length; t++) {
-    let comptype = COMPONENT_TYPES[t];
-
-    // create data for multi-components like switch:0, switch:1 etc
-    let index = 0;
-    let id;
-    while (true) {
-      id = comptype + ":" + index;
-      status = Shelly.getComponentStatus(id);
-
-      if (status === null) break;
-
-      discoveryItems(ploads, mqtt_topic, id, status, macaddr);
-      // Free status after use
-      status = null;
-      index++;
-    }
-  }
-
-  let discoveryTopic;
-  for (let i = 0; i < ploads.length; i++) {
-    ploads[i].data.device = device;
-    discoveryTopic = CONFIG.discovery_topic + ploads[i].domain + "/" + macaddr + "/" + ploads[i].subtopic + "/config";
-    MQTT.publish(discoveryTopic, JSON.stringify(ploads[i].data), 1, true);
-    // Free each pload after publish
-    ploads[i] = null;
-  }
-  // Free ploads array
-  ploads = null;
-  discoveryTopic = null;
-}
 
 function getValTpl(attr) {
   let devclass = getDeviceClass(attr);
@@ -245,7 +114,10 @@ function getValTpl(attr) {
     case "energy":
       return "{{ value_json." + attr + ".total }}";
     case "switch":
-      return "{{ 'on' if value_json." + attr + " else 'off' }}";
+    case "light":
+      return "{{ 'on' if value_json.output else 'off' }}";
+    case "temperature":
+      return "{{ value_json." + attr + ".t" + temperature_unit + " }}";
   }
 
   return "{{ value_json." + attr + " }}";
@@ -255,47 +127,200 @@ function getUniqueId(mac, attr, id) {
   let ret;
 
   if (NAMES[attr] === undefined) ret = attr;
-  else if (id !== undefined) ret = NAMES[attr] + "_" + (id+1);
+  else if (id >= 0) ret = NAMES[attr] + "_" + (id+1);
   else ret = NAMES[attr];
 
   return mac + "_" + ret.toLowerCase().split(" ").join("_");
 }
 
-function getSubTopic(attr, id) {
-  if (id !== undefined) return "status/" + attr;
-  return "status/" + attr + ":" + id;
-}
-
 function getUnits(attr) {
-  if (attr == "temperature") attr = "tC";
+  if (attr == "temperature") attr = "t" + temperature_unit;
   if (UNITS[attr] === undefined) return null;
   return UNITS[attr];
 }
 
-function getName(attr, id) {
-  if (NAMES[attr] === undefined) return attr;
-  if (id !== undefined) return NAMES[attr] + " " + (id+1);
-  return NAMES[attr];
+function getName(info) {
+
+  if ( info.name && (info.attr == 'switch' || info.attr == 'light' )) {
+    return info.name;
+  }
+
+  let name;
+  if (NAMES[info.attr]) name = NAMES[info.attr];
+  else name = info.attr;
+
+  if ( info.name && !(info.attr == 'switch' || info.attr == 'light' )) name = info.name + " " + name;
+  else if (info.ix >= 0) name = name + " " + (info.ix+1);
+  
+  return name;
 }
 
 function getDeviceClass(attr) {
-  if (DEVCLASSES[attr] === undefined) return null;
+  if (DEVCLASSES[attr] === undefined) return attr;
   return DEVCLASSES[attr];
 }
 
 function getDomain(attr) {
-  if (DOMAINS[attr] === undefined) return null;
-  return DOMAINS[attr];
+  if (DOMAINS[attr] !== undefined) return DOMAINS[attr];
+  return attr;
 }
 
 
-mqttreport();
+/**
+ * Cretes and publishes discovery topic for single entity
+ * @param {string} topic Object identifier used for preventing repeating discovery topic creation. Will be returned back in the result struct
+ * @param {string} attr MQTT topic where data are reported to. Needed to include into Discovery definition
+ * @param {int} id Name of object type. Mostly it will be borrowed for entity name
+ * @return {<Object>} Object with data for publishing to MQTT
+ */
+
+function discoveryEntity(topic, info) {
+  let attr_orig = info.attr;
+  
+  if (info.attr == "output") {
+    if (info.altdomain) info.attr = info.altdomain;
+    else info.attr = info.comp
+  }
+
+  let domain = getDomain(info.attr);
+  let pload = {};
+
+  pload["name"] = getName(info);
+  pload["uniq_id"] = getUniqueId(info.mac, attr_orig, info.ix);
+  pload["stat_t"] = topic + "/status/" + info.topic;
+  pload[info.attr == "light" ? "stat_val_tpl" : "val_tpl"] = getValTpl(info.attr);
+  pload.dev_cla = getDeviceClass(info.attr);
+  
+  if (pload.dev_cla == "energy") {
+    pload["stat_cla"] = "total_increasing";
+  } else if (domain == "sensor") {
+    pload["stat_cla"] = "measurement";
+  }
+
+  switch (domain) {
+    case "switch":
+    case "light":
+      pload["cmd_t"] = topic + "/command/" + info.topic;
+      pload["pl_on"] = "on";
+      pload["pl_off"] = "off";
+      break;
+    case "sensor":
+      pload["unit_of_meas"] = getUnits(info.attr);
+      break;
+  }
+
+  if (CAT_DIAGNOSTIC.indexOf(info.attr) != -1) {
+    pload["ent_cat"] = "diagnostic";
+  }
+
+
+  if (DISABLED_ENTS.indexOf(info.attr) != -1) {
+    pload["en"] = "false";
+  }
+
+  return { "domain": domain, "subtopic": info.topic.split(":").join("-") + "-" + attr_orig, "data": pload }
+}
+
+let report_arr = [];
+let report_arr_idx = 0;
+let device;
+let macaddr;
+let devicemqtttopic = Shelly.getComponentConfig("mqtt").topic_prefix;
+let uidata = Shelly.getComponentConfig("sys").ui_data;
+
+/**
+ * Precollects input information needed for creation of MQTT discovery.
+ * 
+ * Data are stored into array, making it possible to track the progress and resume with subsequent Timer calls.
+ */
+function precollect() {
+  let deviceInfo = Shelly.getDeviceInfo();
+  deviceInfo.mac = "B8D61A89XXXX"
+  macaddr = normalizeMacAddress(deviceInfo.mac);
+  device = discoveryDevice(deviceInfo);
+  // Free memory as soon as possible
+  deviceInfo = null;
+  let status;
+
+  
+  for (let t = 0; t < COMPONENT_TYPES.length; t++) {
+    let comptype = COMPONENT_TYPES[t];
+
+    // create data for single components
+    status = Shelly.getComponentStatus(comptype);
+
+    if (status !== null) {
+
+      for (let datattr in status) {
+        if (SUPPORTED_ATTRS.indexOf(datattr) == -1) continue;
+
+        report_arr.push({comp : comptype, ix: -1, attr: datattr, topic: comptype});
+      }
+    }
+    else {
+      let index = 0;
+      while (true) {
+        
+        scomp = comptype + ":" + index;
+        status = Shelly.getComponentStatus(scomp);
+
+        if (status === null) break;
+
+        for (let datattr in status) {
+          if (SUPPORTED_ATTRS.indexOf(datattr) == -1) continue;
+
+            report_arr.push({comp : comptype, ix: index, attr: datattr, topic: scomp});
+        }
+
+        index++;
+      }
+    }
+  }
+}
+
+/**
+ * Picks up next item from the `report_arr`, buils data out of it and publishes it to MQTT discovery topic.
+ * @returns 
+ */
+function mqttreport() {
+
+  if (report_arr[report_arr_idx] ) {
+    info = report_arr[report_arr_idx];
+    report_arr_idx++;
+  } else {
+    Timer.clear(schedurelmqtt);
+    report_arr = null;
+    report_arr_idx = null;
+    device = null;
+    macaddr =null;
+    devicemqtttopic = null;
+    uidata = null;
+    return;
+  }
+
+
+  info.name = Shelly.getComponentConfig(info.topic).name;
+  info.altdomain = uidata.consumption_types[info.ix];
+  info.mac = macaddr;
+
+
+  let data = discoveryEntity(devicemqtttopic, info);
+  data.data.dev = device;
+  discoveryTopic = CONFIG.discovery_topic + "/" + data.domain + "/" + macaddr + "/" + data.subtopic + "/config";
+  MQTT.publish(discoveryTopic, JSON.stringify(data.data), 1, true);
+
+}
+
+
+precollect();
+let schedurelmqtt = Timer.set(1000, true, mqttreport, null);
+
 
 function reportWifiToMQTT() {
-  let mqttConfig = Shelly.getComponentConfig("mqtt");
+  let topic_prefix = Shelly.getComponentConfig("mqtt").topic_prefix;
   let wifiConfig = Shelly.getComponentStatus("wifi");
 
-  MQTT.publish(mqttConfig.topic_prefix + "/status/wifi", JSON.stringify(wifiConfig), 1, false);
+  MQTT.publish(topic_prefix + "/status/wifi", JSON.stringify(wifiConfig), 1, false);
   // Free memory
   mqttConfig = null;
   wifiConfig = null;
