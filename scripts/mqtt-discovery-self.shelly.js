@@ -90,7 +90,7 @@ function discoveryDevice(deviceInfo) {
   const macaddress = normalizeMacAddress(deviceInfo.mac);
 
   let device = {};
-  device.name = macaddress + "-" + deviceInfo.app;
+  device.name = deviceInfo.name ? deviceInfo.name : macaddress + "-" + deviceInfo.app;
   device.ids = [macaddress + ""];
   device.cns = [["mac", macaddress + ""]];
   device.mf = "Shelly"
@@ -275,7 +275,7 @@ let uidata = Shelly.getComponentConfig("sys").ui_data;
  */
 function precollect() {
   let deviceInfo = Shelly.getDeviceInfo();
-  deviceInfo.mac = "B8:D6:1A:89:XX:XX";
+  // deviceInfo.mac = "B8:D6:XX:XX:XX:XX";
   macaddr = normalizeMacAddress(deviceInfo.mac);
   device = discoveryDevice(deviceInfo);
   // Free memory as soon as possible
