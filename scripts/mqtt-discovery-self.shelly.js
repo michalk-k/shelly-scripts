@@ -133,19 +133,12 @@ function getValTpl(attr) {
  * Generates a unique identifier for the entity based on its MAC address, attribute, and index.
  * The identifier is formatted as "mac_address_attribute_index", where attribute is Shelly component name, and index is optional.
  * This way it never change even if you configure switch to be the light.
- * @param {string} mac - MAC address of the device
- * @param {string} attr - Attribute name of the entity
- * @param {number} id - Index of the entity, used to differentiate entities with the same attribute
+ * @param {object} info - Object containing information about the entity, including its MAC address, topic, and attribute
  * @returns {string} - Unique identifier for the entity
  */
-function getUniqueId(mac, attr, id) {
-  let ret;
-
-  if (NAMES[attr] === undefined) ret = attr;
-  else if (id >= 0) ret = NAMES[attr] + "_" + (id+1);
-  else ret = NAMES[attr];
-
-  return mac + "_" + ret.toLowerCase().split(" ").join("_");
+ 
+function getUniqueId(info) {
+  return info.mac + "_" + info.topic.split(":").join("-") + "_" + info.attr;
 }
 
 /**
@@ -212,6 +205,12 @@ function getDomain(attr) {
  * Builds data of single entity to be published to MQTT discovery
  * @param {string} topic Object identifier used for preventing repeating discovery topic creation. Will be returned back in the result struct
  * @param {Object} info Data needed to build the MQTT discovery obejct
+ * @param {string} info.attr Attribute of the entity reported by component status (also reported to MQTT), e.g. "apower", "voltage", "output", etc.
+ * @param {string} info.comp Component type, e.g. "switch", "pm1", etc.
+ * @param {number} info.ix Index of the entity within the component, used for components with multiple instances
+ * @param {string} info.topic Topic name the component status data is reported to.
+ * @param {string} info.altdomain Alternative domain for the entity, if applicable.
+ * @param {string} info.mac MAC address of the device, used for unique identification
  * @returns {Object} Object with data for publishing to MQTT
  */
 function discoveryEntity(topic, info) {
@@ -226,7 +225,7 @@ function discoveryEntity(topic, info) {
   let pload = {};
 
   pload["name"] = getName(info);
-  pload["uniq_id"] = getUniqueId(info.mac, attr_orig, info.ix);
+  pload["uniq_id"] = getUniqueId(info);
   pload["stat_t"] = topic + "/status/" + info.topic;
   pload[info.attr == "light" ? "stat_val_tpl" : "val_tpl"] = getValTpl(info.attr);
   pload.dev_cla = getDeviceClass(info.attr);
@@ -274,15 +273,8 @@ let uidata = Shelly.getComponentConfig("sys").ui_data;
  * Data are stored into array, making it possible to track the progress and resume with subsequent Timer calls.
  */
 function precollect() {
-  let deviceInfo = Shelly.getDeviceInfo();
-  // deviceInfo.mac = "B8:D6:XX:XX:XX:XX";
-  macaddr = normalizeMacAddress(deviceInfo.mac);
-  device = discoveryDevice(deviceInfo);
-  // Free memory as soon as possible
-  deviceInfo = null;
   let status;
 
-  
   for (let t = 0; t < COMPONENT_TYPES.length; t++) {
     let comptype = COMPONENT_TYPES[t];
 
@@ -339,7 +331,17 @@ function mqttreport() {
     return;
   }
 
+  if (!device === undefined) {
+    let deviceInfo = Shelly.getDeviceInfo();
+    // deviceInfo.mac = "B8:D6:XX:XX:XX:XX";
+    macaddr = normalizeMacAddress(deviceInfo.mac);
+    device = discoveryDevice(deviceInfo);
+    // Free memory as soon as possible
+    deviceInfo = null;
+  }
+  
   info.name = Shelly.getComponentConfig(info.topic).name;
+
   info.altdomain = uidata.consumption_types[info.ix];
   info.mac = macaddr;
 
@@ -353,6 +355,12 @@ function mqttreport() {
 // This will also set up a timer to publish one collected entity per second
 precollect();
 let schedurelmqtt = Timer.set(1000, true, mqttreport, null);
+
+
+
+/**************************
+* RSSI (WiFi) reporting
+**************************/
 
 /**
  * Reports the WiFi configuration to MQTT.
