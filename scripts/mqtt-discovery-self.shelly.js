@@ -82,8 +82,14 @@ function normalizeMacAddress(address) {
  *
  * Device name is built from its mac address and model name.
  *
- * @param deviceInfo {Object} - object with device information, including app, model, version, generation, etc.
- * @returns {Object} device object structured for MQTT discovery
+ * @param {Object} deviceInfo - object with device information, including:
+ * @param {string} deviceInfo.app - Device application/model name (e.g., "Plus 1PM")
+ * @param {string} deviceInfo.model - Device model identifier (e.g., "SHPLG-S")
+ * @param {string} deviceInfo.ver - Firmware version (e.g., "1.0.0")
+ * @param {number|string} deviceInfo.gen - Device generation (e.g., 2)
+ * @param {string} deviceInfo.mac - MAC address (e.g., "B8:D6:XX:XX:XX:XX")
+ * @param {string} [deviceInfo.name] - Optional user-defined device name
+ * @returns {Object} The device object with the following structure:
  */
 function discoveryDevice(deviceInfo) {
 
@@ -136,7 +142,6 @@ function getValTpl(attr) {
  * @param {object} info - Object containing information about the entity, including its MAC address, topic, and attribute
  * @returns {string} - Unique identifier for the entity
  */
- 
 function getUniqueId(info) {
   return info.mac + "_" + info.topic.split(":").join("-") + "_" + info.attr;
 }
@@ -351,6 +356,10 @@ function mqttreport() {
   MQTT.publish(discoveryTopic, JSON.stringify(data.data), 1, true);
 }
 
+/***************************************
+* Generate MQTT Discovery
+***************************************/
+
 // Initial precollection of entities to be reported
 // This will also set up a timer to publish one collected entity per second
 precollect();
@@ -358,9 +367,9 @@ let schedurelmqtt = Timer.set(1000, true, mqttreport, null);
 
 
 
-/**************************
+/***************************************
 * RSSI (WiFi) reporting
-**************************/
+***************************************/
 
 /**
  * Reports the WiFi configuration to MQTT.
