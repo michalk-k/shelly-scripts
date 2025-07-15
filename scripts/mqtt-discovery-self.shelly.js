@@ -2,10 +2,11 @@ let CONFIG = {
   debug: true,
   discovery_topic: "homeassistant",
   report_ip: true,
-  temperature_unit: "C" // C or F - Uppercase!!!
+  temperature_unit: "C", // C or F - Uppercase!!!
+  disable_minor_entities: true
 };
 
-const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "em1", "temperature"];
+const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "emdata", "temperature"];
 const SUPPORTED_ATTRS = ["apower", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature", "tC", "tF"];
 
 const CAT_DIAGNOSTIC = ["rssi","temperature"];
@@ -34,7 +35,9 @@ const ALIASES = {
   "b_total_act_ret_energy": "ret_aenergy",
   "c_total_act_ret_energy": "ret_aenergy",
   "total_act": "aenergy",
-  "total_act_ret": "ret_aenergy"
+  "total_act_ret": "ret_aenergy",
+  "tF": "temperature",
+  "tC": "temperature"
 }
 
 const DEVCLASSES = {
@@ -142,23 +145,27 @@ function discoveryDevice(deviceInfo) {
   * Returns a template for value extraction from MQTT message.
   * The template is based on the attribute type and its device class.
   *
-  * @param {string} attr - attribute name for which the template is to be created
+  * @param {object} info - attribute name for which the template is to be created
   * @returns {string} - template string for extracting value from MQTT message
   */
-function getValTpl(attr) {
-  let devclass = getDeviceClass(attr);
+function getValTpl(info) {
+  let devclass = getDeviceClass(info.attr);
 
-  switch (devclass) {
-    case "energy":
-      return "{{ value_json." + attr + ".total }}";
-    case "switch":
-    case "light":
-      return "{{ 'on' if value_json.output else 'off' }}";
-    case "temperature":
-      return "{{ value_json." + attr + ".t" + CONFIG.temperature_unit + " }}";
-  }
+  if (info.attr == "aenergy") return "{{ value_json." + info.attr + ".total }}";
+  if (info.attr == "output") return "{{ 'on' if value_json.output else 'off' }}";
+  if (info.attr == "temperature") return "{{ value_json." + info.attr + ".t" + CONFIG.temperature_unit + " }}";
 
-  return "{{ value_json." + attr + " }}";
+  // switch (devclass) {
+  //   case "energy":
+  //     return "{{ value_json." + attr + ".total }}";
+  //   case "switch":
+  //   case "light":
+  //     return "{{ 'on' if value_json.output else 'off' }}";
+  //   case "temperature":
+  //     return "{{ value_json." + attr + ".t" + CONFIG.temperature_unit + " }}";
+  // }
+
+  return "{{ value_json." + info.attr + " }}";
 }
 
 /**
@@ -202,9 +209,9 @@ function getName(info) {
   else name = info.attr_common;
 
   if (info.name) name = info.name + " " + name;
-  else if (info.ix >= 0) name = name + " " + (info.ix+1);
-  
-  if (info.attr != info.attr_common) name =+ " " + info.attr_common.split("_")["0"];
+  else if (info.ix >= 0 && !info.issingle) name = name + " " + (info.ix+1);
+
+  if (info.attr != info.attr_common) name = name + " " + info.attr.split("_")["0"].toUpperCase();
  
   return name;
 }
@@ -272,7 +279,7 @@ function discoveryEntity(topic, info) {
   pload["name"] = getName(info);
   pload["uniq_id"] = getUniqueId(info);
   pload["stat_t"] = topic + "/status/" + info.topic;
-  pload[info.attr_common == "light" ? "stat_val_tpl" : "val_tpl"] = getValTpl(info.attr_common);
+  pload[info.attr_common == "light" ? "stat_val_tpl" : "val_tpl"] = getValTpl(info);
   pload.dev_cla = getDeviceClass(info.attr_common);
   
   if (pload.dev_cla == "energy") {
@@ -298,17 +305,17 @@ function discoveryEntity(topic, info) {
   }
 
 
-  if (DISABLED_ENTS.indexOf(info.attr_common) != -1) {
+  if (CONFIG.disable_minor_entities && DISABLED_ENTS.indexOf(info.attr_common) != -1) {
     pload["en"] = "false";
   }
 
-  return { "domain": domain, "subtopic": info.topic.split(":").join("-") + "-" + info.attr, "data": pload }
+  return { "domain": domain, "subtopic": info.topic.split(":").join("") + "-" + info.attr, "data": pload }
 }
 
 let report_arr = [];
 let report_arr_idx = 0;
+let comp_inst_num = {};
 let device;
-let macaddr;
 let devicemqtttopic = Shelly.getComponentConfig("mqtt").topic_prefix;
 let uidata = Shelly.getComponentConfig("sys").ui_data;
 
@@ -329,13 +336,16 @@ function precollect() {
     if (status !== null) {
 
       for (let datattr in status) {
-        if (SUPPORTED_ATTRS.indexOf(datattr) == -1) continue;
+        if (SUPPORTED_ATTRS.indexOf(getCommonAttr(datattr)) == -1) continue;
 
         report_arr.push({comp : comptype, ix: -1, attr: datattr, topic: comptype});
       }
+
+      comp_inst_num[comptype] = 1;
     }
     else {
       let index = 0;
+
       while (true) {
         
         let scomp = comptype + ":" + index;
@@ -344,15 +354,18 @@ function precollect() {
         if (status === null) break;
 
         for (let datattr in status) {
-          if (SUPPORTED_ATTRS.indexOf(datattr) == -1) continue;
+          if (SUPPORTED_ATTRS.indexOf(getCommonAttr(datattr)) == -1) continue;
 
             report_arr.push({comp : comptype, ix: index, attr: datattr, topic: scomp});
         }
 
         index++;
+        comp_inst_num[comptype] = index;
+        
       }
     }
   }
+
 }
 
 /**
@@ -364,37 +377,41 @@ function mqttreport() {
 
   if (report_arr[report_arr_idx] ) {
     info = report_arr[report_arr_idx];
+    report_arr[report_arr_idx] = null;
     report_arr_idx++;
   } else {
     Timer.clear(schedurelmqtt);
     report_arr = null;
     report_arr_idx = null;
+    comp_inst_num = null;
     device = null;
-    macaddr =null;
     devicemqtttopic = null;
     uidata = null;
     return;
   }
 
-  if (!device === undefined) {
+  if (!device) {
     let deviceInfo = Shelly.getDeviceInfo();
-    // deviceInfo.mac = "B8:D6:XX:XX:XX:XX";
-    macaddr = normalizeMacAddress(deviceInfo.mac);
     device = discoveryDevice(deviceInfo);
     // Free memory as soon as possible
     deviceInfo = null;
   }
   
+  
   info.name = Shelly.getComponentConfig(info.topic).name;
-
-  info.altdomain = uidata.consumption_types[info.ix];
-  info.mac = macaddr;
+  info.mac = device.cns[0][1];
   info.attr_common = getCommonAttr(info.attr);
+  if (uidata.consumption_types && uidata.consumption_types[info.ix]) info.altdomain = uidata.consumption_types[info.ix];
+
+  info.issingle = comp_inst_num[info.comp] == 1;
 
   let data = discoveryEntity(devicemqtttopic, info);
-  let discoveryTopic = CONFIG.discovery_topic + "/" + data.domain + "/" + macaddr + "/" + data.subtopic + "/config";
+  let discoveryTopic = CONFIG.discovery_topic + "/" + data.domain + "/" + info.mac + "/" + data.subtopic + "/config";
   data.data.dev = device;
   MQTT.publish(discoveryTopic, JSON.stringify(data.data), 1, true);
+
+  data = null;
+  info = null;
 }
 
 /***************************************
