@@ -211,7 +211,7 @@ function getName(info) {
   if (info.name) name = info.name + " " + name;
   else if (info.ix >= 0 && !info.issingle) name = name + " " + (info.ix+1);
 
-  if (info.attr != info.attr_common) name = name + " " + info.attr.split("_")["0"].toUpperCase();
+  if (info.attr != info.attr_common && info.attr != "output") name = name + " " + info.attr.split("_")["0"].toUpperCase();
  
   return name;
 }
