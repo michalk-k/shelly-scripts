@@ -5,11 +5,37 @@ let CONFIG = {
   temperature_unit: "C" // C or F - Uppercase!!!
 };
 
-const COMPONENT_TYPES = ["switch", "pm1", "wifi"];
-const SUPPORTED_ATTRS = ["apower", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature"];
+const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "em1", "temperature"];
+const SUPPORTED_ATTRS = ["apower", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature", "tC", "tF"];
 
 const CAT_DIAGNOSTIC = ["rssi","temperature"];
 const DISABLED_ENTS = ["pf", "voltage", "freq", "current", "ret_aenergy"];
+
+const ALIASES = {
+  "a_current": "current",
+  "b_current": "current",
+  "c_current": "current",
+  "a_voltage": "voltage",
+  "b_voltage": "voltage",
+  "c_voltage": "voltage",
+  "a_freq": "freq",
+  "b_freq": "freq",
+  "c_freq": "freq",
+  "a_pf": "pf",
+  "b_pf": "pf",
+  "c_pf": "pf",
+  "a_act_power": "apower",
+  "b_act_power": "apower",
+  "c_act_power": "apower",
+  "a_total_act_energy": "aenergy",
+  "b_total_act_energy": "aenergy",
+  "c_total_act_energy": "aenergy",
+  "a_total_act_ret_energy": "ret_aenergy",
+  "b_total_act_ret_energy": "ret_aenergy",
+  "c_total_act_ret_energy": "ret_aenergy",
+  "total_act": "aenergy",
+  "total_act_ret": "ret_aenergy"
+}
 
 const DEVCLASSES = {
   "apower": "power",
@@ -143,7 +169,7 @@ function getValTpl(attr) {
  * @returns {string} - Unique identifier for the entity
  */
 function getUniqueId(info) {
-  return info.mac + "_" + info.topic.split(":").join("-") + "_" + info.attr;
+  return info.mac + "_" + info.topic.split(":").join("") + "_" + info.attr;
 }
 
 /**
@@ -167,18 +193,31 @@ function getUnits(attr) {
   */
 function getName(info) {
 
-  if ( info.name && (info.attr == 'switch' || info.attr == 'light' )) {
+  if ( info.name && (info.attr_common == 'switch' || info.attr_common == 'light' )) {
     return info.name;
   }
 
   let name;
-  if (NAMES[info.attr]) name = NAMES[info.attr];
-  else name = info.attr;
+  if (NAMES[info.attr_common]) name = NAMES[info.attr_common];
+  else name = info.attr_common;
 
-  if ( info.name && !(info.attr == 'switch' || info.attr == 'light' )) name = info.name + " " + name;
+  if (info.name) name = info.name + " " + name;
   else if (info.ix >= 0) name = name + " " + (info.ix+1);
   
+  if (info.attr != info.attr_common) name =+ " " + info.attr_common.split("_")["0"];
+ 
   return name;
+}
+
+/**
+ * Retrieves the common attribute value for the specified attribute name.
+ *
+ * @param {string} attr - The name of the attribute to retrieve.
+ * @returns {string} The value of the specified common attribute.
+ */
+function getCommonAttr(attr) {
+  if (ALIASES[attr] === undefined) return attr;
+  return ALIASES[attr];
 }
 
 /** 
@@ -210,7 +249,8 @@ function getDomain(attr) {
  * Builds data of single entity to be published to MQTT discovery
  * @param {string} topic Object identifier used for preventing repeating discovery topic creation. Will be returned back in the result struct
  * @param {Object} info Data needed to build the MQTT discovery obejct
- * @param {string} info.attr Attribute of the entity reported by component status (also reported to MQTT), e.g. "apower", "voltage", "output", etc.
+ * @param {string} info.attr Attribute of the entity reported by component status (also reported to MQTT), e.g. "apower", "voltage", a_voltage, b_voltage etc.
+ * @param {string} info.attr_common Like `attr` but translated to common value, for example `a_voltage`, `b_voltage` translated to `voltage`
  * @param {string} info.comp Component type, e.g. "switch", "pm1", etc.
  * @param {number} info.ix Index of the entity within the component, used for components with multiple instances
  * @param {string} info.topic Topic name the component status data is reported to.
@@ -219,21 +259,21 @@ function getDomain(attr) {
  * @returns {Object} Object with data for publishing to MQTT
  */
 function discoveryEntity(topic, info) {
-  let attr_orig = info.attr;
+  let attr_orig = info.attr_common;
   
   if (info.attr == "output") {
-    if (info.altdomain) info.attr = info.altdomain;
-    else info.attr = info.comp
+    if (info.altdomain) info.attr_common = info.altdomain;
+    else info.attr_common = info.comp
   }
 
-  let domain = getDomain(info.attr);
+  let domain = getDomain(info.attr_common);
   let pload = {};
 
   pload["name"] = getName(info);
   pload["uniq_id"] = getUniqueId(info);
   pload["stat_t"] = topic + "/status/" + info.topic;
-  pload[info.attr == "light" ? "stat_val_tpl" : "val_tpl"] = getValTpl(info.attr);
-  pload.dev_cla = getDeviceClass(info.attr);
+  pload[info.attr_common == "light" ? "stat_val_tpl" : "val_tpl"] = getValTpl(info.attr_common);
+  pload.dev_cla = getDeviceClass(info.attr_common);
   
   if (pload.dev_cla == "energy") {
     pload["stat_cla"] = "total_increasing";
@@ -249,20 +289,20 @@ function discoveryEntity(topic, info) {
       pload["pl_off"] = "off";
       break;
     case "sensor":
-      pload["unit_of_meas"] = getUnits(info.attr);
+      pload["unit_of_meas"] = getUnits(info.attr_common);
       break;
   }
 
-  if (CAT_DIAGNOSTIC.indexOf(info.attr) != -1) {
+  if (CAT_DIAGNOSTIC.indexOf(info.attr_common) != -1) {
     pload["ent_cat"] = "diagnostic";
   }
 
 
-  if (DISABLED_ENTS.indexOf(info.attr) != -1) {
+  if (DISABLED_ENTS.indexOf(info.attr_common) != -1) {
     pload["en"] = "false";
   }
 
-  return { "domain": domain, "subtopic": info.topic.split(":").join("-") + "-" + attr_orig, "data": pload }
+  return { "domain": domain, "subtopic": info.topic.split(":").join("-") + "-" + info.attr, "data": pload }
 }
 
 let report_arr = [];
@@ -349,6 +389,7 @@ function mqttreport() {
 
   info.altdomain = uidata.consumption_types[info.ix];
   info.mac = macaddr;
+  info.attr_common = getCommonAttr(info.attr);
 
   let data = discoveryEntity(devicemqtttopic, info);
   let discoveryTopic = CONFIG.discovery_topic + "/" + data.domain + "/" + macaddr + "/" + data.subtopic + "/config";
