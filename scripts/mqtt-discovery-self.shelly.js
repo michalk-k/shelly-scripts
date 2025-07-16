@@ -1,10 +1,9 @@
 let CONFIG = {
-  debug: true,
   discovery_topic: "homeassistant",
   report_ip: true,
   temperature_unit: "C", // C or F - Uppercase!!!
-  disable_minor_entities: true,
-  ignore_names: false,  
+  disable_minor_entities: true, // Some entities will be disabled by default , see DISABLED_ENTS (can be enabled later in HA)
+  ignore_names: false,  // do not use device and channel names configured in the Shelly
   fake_macaddress: null // for testing purposes, set alternative macaddress 
 };
 
