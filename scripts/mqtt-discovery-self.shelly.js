@@ -4,7 +4,8 @@ let CONFIG = {
   report_ip: true,
   temperature_unit: "C", // C or F - Uppercase!!!
   disable_minor_entities: true,
-  ignore_names: false
+  ignore_names: false,  
+  fake_macaddress: null // for testing purposes, set alternative macaddress 
 };
 
 const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "em1", "emdata", "em1data", "temperature"];
@@ -135,7 +136,7 @@ function normalizeMacAddress(address) {
  */
 function discoveryDevice(deviceInfo) {
 
-  const macaddress = normalizeMacAddress(deviceInfo.mac);
+  const macaddress = normalizeMacAddress(CONFIG.fake_macaddress ? CONFIG.fake_macaddress : deviceInfo.mac);
 
   let device = {};
   device.name = deviceInfo.name && !CONFIG.ignore_names ? deviceInfo.name : macaddress + "-" + deviceInfo.app;

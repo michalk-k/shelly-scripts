@@ -28,9 +28,11 @@ Currently supports following SHelly components (they can be found in different S
 **) Shelly devices report temperature only on temperature changes. Once temperature stabilizes, MQTT topic is not updated anymore. In conjunction with non-retained topic, it might lead to unknown value for long time, ie after HA restart or HA entity reinitialization.
 
 SO far tested with following devices:
-* Mini PM gen3
+* Mini PM gen3 <sub><details><summary>Click for screenshot</summary>![screenshot](images/device_page_pmminigen3.png)</details></sub>
+* Plus 1PM (gen2): <sub><details><summary>Click for screenshot</summary>![screenshot](images/device_page_pluspm.png)</details></sub>
 * Plus 2PM (gen2)
-* Pro EM3 (gen2) - both profiles: monophase and triphase
+* Pro EM3 (gen2) - both profiles: <sub><details><summary>Click to see screenhots</summary> **Monophase** ![monophase](images/device_page_pro3em_monophase.png) **Triphase** ![triphase](images/device_page_pro3em_triphase.png) 
+</details></sub>
 
 ![Device Page](images/device_page_overview.png)
 
