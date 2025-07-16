@@ -20,8 +20,8 @@ Currently supports following SHelly components (they can be found in different S
 * switch
 * pm1
 * wifi *)
-* em
-* emdata
+* em, em1
+* emdata, em1data
 * temperature **)
 
 *) wifi component isn't originally repoted to MQTT. This script adds periodical reporting of Wifi component status to topic configured in MQTT configuration ![WIFI added to MQTT](images/mqtt_wifi.png)
@@ -30,7 +30,7 @@ Currently supports following SHelly components (they can be found in different S
 SO far tested with following devices:
 * Mini PM gen3
 * Plus 2PM (gen2)
-* Pro EM3 (gen2)
+* Pro EM3 (gen2) - both profiles: monophase and triphase
 
 ![Device Page](images/device_page_overview.png)
 
