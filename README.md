@@ -11,23 +11,36 @@ Read documentation for further steps.
 
 ## MQTT DISCOVERY SELF
 
-The script registers the Shelly device the script is run on and its entities, to Home Assistant, using MQTT discovery.\
+> It requires the MQTT to be enabled and configured in the Shelly device.
+
+The script registers the Shelly device the script runs on and its entities, to Home Assistant, using MQTT discovery.\
 It creates entities for all supported properties: switches, sensors etc.
 
-> It requires the MQTT to be enabled and configured in the Shelly device.
+Currently supports following SHelly components (they can be found in different SHelly devices):
+* switch
+* pm1
+* wifi *)
+* em
+* emdata
+* temperature **)
+
+*) wifi component isn't originally repoted to MQTT. This script adds periodical reporting of Wifi component status to topic configured in MQTT configuration ![WIFI added to MQTT](images/mqtt_wifi.png)
+**) Shelly devices report temperature only on temperature changes. Once temperature stabilizes, MQTT topic is not updated anymore. In conjunction with non-retained topic, it might lead to unknown value for long time, ie after HA restart or HA entity reinitialization.
+
+SO far tested with following devices:
+* Mini PM gen3
+* Plus 2PM (gen2)
+* Pro EM3 (gen2)
 
 ![Device Page](images/device_page_overview.png)
 
-No special configuration actions are needed. 
-
-The script follows Home Assistant conventions in how to setup entities.
-
-Some entities may be disabled by default, since they are considered not commonly used. For example Voltage and Current sensors entities are disabled, while Power and Energy remains exposed.
-
-On top of that, the script adds wifi status reporting to MQTT. It's required to create RSSI sensor. The RSSI value will be refreshed every minute.
-
-![WIFI added to MQTT](images/mqtt_wifi.png)
-
+**Features**
+* easy to use: just run it
+* by default creates generic device and entity names (see Naming below)
+* device and entity names might be overriden by shelly device configuration (device name and channel names)
+* switch can be reported as a light entity to HA (set `consumption type` to `light`)
+* some of sensors are disabled by default, for example power factor or voltage.
+* The script follows recent Home Assistant conventions in how to setup entities.
 
 
 ### Naming
