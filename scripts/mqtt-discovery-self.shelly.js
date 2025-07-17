@@ -4,7 +4,11 @@ let CONFIG = {
   temperature_unit: "C", // C or F - Uppercase!!!
   disable_minor_entities: true, // Some entities will be disabled by default , see DISABLED_ENTS (can be enabled later in HA)
   ignore_names: false,  // do not use device and channel names configured in the Shelly
-  fake_macaddress: null // for testing purposes, set alternative macaddress 
+  fake_macaddress: null, // for testing purposes, set alternative macaddress
+  mqtt_publish_pause: 500, // ms
+
+  components_refresh: ["wifi", "temperature:0"],
+  components_refresh_period: 60 // seconds
 };
 
 const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "em1", "emdata", "em1data", "temperature"];
@@ -438,7 +442,7 @@ function mqttreport() {
 // Initial precollection of entities to be reported
 // This will also set up a timer to publish one collected entity per second
 precollect();
-let schedurelmqtt = Timer.set(1000, true, mqttreport, null);
+let schedurelmqtt = Timer.set(CONFIG.mqtt_publish_pause, true, mqttreport, null);
 
 
 
@@ -453,7 +457,7 @@ let schedurelmqtt = Timer.set(1000, true, mqttreport, null);
  */
 function reportWifiToMQTT() {
   let topic_prefix = Shelly.getComponentConfig("mqtt").topic_prefix;
-  let components = ["wifi", "temperature:0"];
+  let components = CONFIG.components_refresh;
 
   for (let t = 0; t < components.length; t++) {
     let status = Shelly.getComponentStatus(components[t]);
@@ -466,4 +470,4 @@ function reportWifiToMQTT() {
 // Initial call to report WiFi status
 // This will also set up a timer to report WiFi status every 60 seconds
 reportWifiToMQTT();
-let timer_handle = Timer.set(60000, true, reportWifiToMQTT, null);
+let timer_handle = Timer.set(CONFIG.components_refresh_period * 1000, true, reportWifiToMQTT, null);
