@@ -7,8 +7,8 @@ let CONFIG = {
   fake_macaddress: null // for testing purposes, set alternative macaddress 
 };
 
-const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "em1", "emdata", "em1data", "temperature"];
-const SUPPORTED_ATTRS = ["apower", "aprt_power", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature", "tC", "tF"];
+const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "em1", "emdata", "em1data", "temperature", "cover",];
+const SUPPORTED_ATTRS = ["apower", "aprt_power", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature", "tC", "tF", "state"];
 
 const CAT_DIAGNOSTIC = ["rssi","temperature"];
 const DISABLED_ENTS = ["pf", "voltage", "freq", "current", "ret_aenergy"];
@@ -61,7 +61,8 @@ const DEVCLASSES = {
   "temperature": "temperature",
   "switch": "switch", // from docs: possible none, switch, outlet
   "rssi": "signal_strength",
-  "light": "light"
+  "light": "light",
+  "state": null,
 }
 
 const NAMES = {
@@ -76,7 +77,8 @@ const NAMES = {
   "temperature": "Temperature",
   "output": "Switch",
   "rssi": "RSSI",
-  "light": "Light"
+  "light": "Light",
+  "state": "Cover",
 }
 
 const UNITS = {
@@ -102,7 +104,7 @@ const DOMAINS = {
   "ret_aenergy": "sensor",
   "tC": "sensor",
   "tF": "sensor",
-  "state": "binary_sensor",
+  "state": "cover", //(was binary_sensor but I don't where appplied)
   "output": "switch",
   "pf": "sensor",
   "rssi": "sensor",
@@ -310,6 +312,17 @@ function discoveryEntity(topic, info) {
       break;
     case "sensor":
       pload["unit_of_meas"] = getUnits(info.attr_common);
+      break;
+    case "cover":
+      pload["cmd_t"] = topic + "/command/" + info.topic;
+      pload["pos_t"] = topic + "/status/" + info.topic;
+      pload["pos_tpl"] = "{{ value_json.current_pos }}"
+      pload["set_pos_t"] = topic + "/command/" + info.topic;
+      pload["set_pos_tpl"] = "pos,{{ position }}";
+      pload["pl_open"] = "open";
+      pload["pl_stop"] = "stop";
+      pload["pl_close"] = "close";
+      pload["opt"] = false;
       break;
   }
 
