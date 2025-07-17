@@ -29,6 +29,85 @@ Compatibility with devices depends on components those devices implemet. Tested 
 <sup>*)</sup> wifi component isn't originally repoted to MQTT. This script adds periodical reporting of Wifi component status to topic configured in MQTT configuration <details><summary>screenshot</summary> ![WIFI added to MQTT](images/mqtt_wifi.png) </details>
 <sup>**)</sup> Shelly devices report temperature only on temperature changes. Once temperature stabilizes, MQTT topic is not updated anymore. In conjunction with non-retained topic, it might lead to unknown value for long time, ie after HA restart or HA entity reinitialization.
 
+### Supported devices
+✅ - confirmed by comparison of components implemented in the script
+
+☑️ - as above, but support is limited to subset of available device profiles.
+
+✔️ - tested by me
+
+**Gen 2 devices**
+| Device Name                     | Components                         | Supported |
+| ------------------------------- | ---------------------------------- | ----------------- |
+| Shelly Plus 1 (Mini)            | switch                             | ✅                 |
+| Shelly Plus 1 PM (Mini)         | switch,                            | ✅  ✔️             |
+| Shelly Plus 2 PM                | switch,  cover                     | ☑️ ✔️ (switch only)  |
+| Shelly Plus I4                  | input                              | ✅                 |
+| Shelly Plus Plug IT             | switch,                            | ✅                 |
+| Shelly Plus Plug S              | switch,                            | ✅                 |
+| Shelly Plus Plug UK             | switch,                            | ✅                 |
+| Shelly Plus Plug US             | switch,                            | ✅                 |
+| Shelly Plus H & T               | humidity, temperature, devicepower |                   |
+| Shelly Plus Smoke               | smoke                              |                   |
+| Shelly Plus WallDimmer          | light                              |                   |
+| Shelly Plus RGBW PM             | light, rgb, rgbw                   |                   |
+| Shelly Plus 0 – 10 V Dimmer     | light                              |                   |
+| Shelly Plus PM Mini             | switch, pm1                        | ✅                 |
+| Shelly Plus Uni                 | switch, temperature, humidity, voltmeter  |  ☑️ (switch only)   |
+| Shelly Pro 1                    | switch                             | ✅                 |
+| Shelly Pro 1 PM                 | switch                             | ✅                 |
+| Shelly Pro 2                    | switch                             | ✅                 |
+| Shelly Pro 2 PM                 | switch, cover                      | ☑️ (switch only)   |
+| Shelly Pro 3                    | switch                             | ✅                 |
+| Shelly Pro 4 PM                 | switch                             | ✅                 |
+| Shelly Pro Dual Cover PM        | cover                              |                    |
+| Shelly Pro EM                   | switch, em1, em1data               | ✅                 |
+| Shelly Pro 3 EM (400)           | em, em1, emdata, em1data           | ✅ ✔️              |
+| Shelly Pro Dimmer 1 PM          | light                              |                   |
+| Shelly Pro Dimmer 2 PM          | light                              |                   |
+| Shelly Pro Dimmer 0/1 – 10 V PM | light                              |                   |
+| Shelly Pro RGBWW PM             | light, rgb, cct                    |                   |
+| Shelly BLU Gateway              | *(none)*                           |                   |
+
+
+**Gen 3 devices**
+| Device Name                 | Components                         | Supported |
+| --------------------------- | ---------------------------------- | ----------------- |
+| Shelly 1                    | switch                             | ✅                 |
+| Shelly 1 PM                 | switch                             | ✅                 |
+| Shelly 2 PM                 | switch                             | ✅                 |
+| Shelly I4 / I4DC            | input                              |                    |
+| Shelly 1 L                  | switch                             | ✅                 |
+| Shelly 2 L                  | switch                             | ✅                 |
+| Shelly 1 Mini               | switch                             | ✅                 |
+| Shelly 1 PM Mini            | switch                             | ✅                 |
+| Shelly PM Mini              | pm1                                | ✅ ✔️              |
+| Shelly AZ Plug              | switch                             | ✅                 |
+| Shelly Plug S               | switch                             | ✅                 |
+| Shelly Outdoor Plug S       | switch                             | ✅                 |
+| Shelly Dimmer 0/1 – 10 V PM | light                              |                    |
+| Shelly Dimmer               | light                              |                    |
+| Shelly D Dimmer             | light                              |                    |
+| Shelly H & T                | humidity, temperature, devicepower |                    |
+| Shelly 3 EM                 | em, em1data                        | ✅                 |
+| Shelly EM                   | em1, em1data                       | ✅                 |
+| Shelly BLU Gateway Gen3     | *(none)*                           |                    |
+| Shelly Shutter              | cover                      | |
+
+
+**Gen 4 devices**
+| Device Name      | Components  | Supported |
+| ---------------- | ----------- | ----------------- |
+| Shelly 1         | switch      | ✅                 |
+| Shelly 1 PM      | switch      | ✅                 |
+| Shelly 1 Mini    | switch      | ✅                 |
+| Shelly 1 PM Mini | switch      | ✅                 |
+| Shelly 2 PM      | switch      | ✅                 |
+
+
+
+
+
 ### Features
 * easy to use: just run it
 * by default creates generic device and entity names (see Naming below)
