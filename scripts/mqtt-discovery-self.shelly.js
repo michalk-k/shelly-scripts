@@ -1,14 +1,17 @@
 let CONFIG = {
+  
+  temperature_unit: "C",            // C or F - Uppercase!!!
+  disable_minor_entities: true,     // Some entities will be disabled by default (can be enabled later in HA), see DISABLED_ENTS 
+  ignore_names: true,               // If true, device and channel names configured withing Shelly will not be used. Configure them in HA. It's less error prone approach
+  
+  report_ip: true,                  // create URL link to open Shelly GUI from HA
+  fake_macaddress: null,            // for testing purposes, set alternative macaddress
+
   discovery_topic: "homeassistant",
-  report_ip: true,
-  temperature_unit: "C", // C or F - Uppercase!!!
-  disable_minor_entities: true, // Some entities will be disabled by default , see DISABLED_ENTS (can be enabled later in HA)
-  ignore_names: false,  // do not use device and channel names configured in the Shelly
-  fake_macaddress: null, // for testing purposes, set alternative macaddress
-  mqtt_publish_pause: 500, // ms
+  mqtt_publish_pause: 500,          // (milliseconds) discovery entities will are published to MQTT entry-by-entry with pause inbeetween
 
   components_refresh: ["wifi", "temperature:0"],
-  components_refresh_period: 60 // seconds
+  components_refresh_period: 60     // (seconds) how often report components above to mqtt
 };
 
 const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "em1", "emdata", "em1data", "temperature"];
