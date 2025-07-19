@@ -402,7 +402,7 @@ function mqttreport() {
     report_arr[report_arr_idx] = null;
     report_arr_idx++;
   } else {
-    Timer.clear(schedurelmqtt);
+    Timer.clear(discoverytimer);
     report_arr = null;
     report_arr_idx = null;
     comp_inst_num = null;
@@ -418,7 +418,6 @@ function mqttreport() {
     // Free memory as soon as possible
     deviceInfo = null;
   }
-  
   
   if (!CONFIG.ignore_names) info.name = Shelly.getComponentConfig(info.topic).name;
   info.mac = device.cns[0][1];
@@ -438,14 +437,23 @@ function mqttreport() {
   info = null;
 }
 
-/***************************************
-* Generate MQTT Discovery
-***************************************/
+/**
+ * MQTT Discovery timer object
+ */
+let discoverytimer;
 
-// Initial precollection of entities to be reported
-// This will also set up a timer to publish one collected entity per second
-precollect();
-let schedurelmqtt = Timer.set(CONFIG.mqtt_publish_pause, true, mqttreport, null);
+/**
+ *  Generate MQTT Discovery
+ * Initial precollection of entities to be reported.
+ * This will also set up a timer to publish one collected entity per per time-period.
+ * @returns 
+ */
+function main() {
+  precollect();
+  discoverytimer = Timer.set(CONFIG.mqtt_publish_pause, true, mqttreport);
+}
+
+main();
 
 
 
