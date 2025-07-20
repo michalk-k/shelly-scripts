@@ -18,13 +18,34 @@ It creates entities for all supported properties: switches, sensors etc.
 
 Currently supports following SHelly components (they can be found in different SHelly devices):
 * switch
+* cover (incl. position and slat if enabled)
 * pm1
 * wifi <sup>*)</sup>
 * em, em1
 * emdata, em1data
 * temperature <sup>**)</sup>
 
-Compatibility with devices depends on components those devices implemet. Tested with following devices (click on them for screenshots): <details><summary>Mini PM gen3</summary> ![screenshot xc](images/device_page_pmminigen3.png) </details><details><summary>Plus 1PM (gen2)</summary>![screenshot](images/device_page_pluspm.png)</details><details><summary>Plus 2PM (gen2)</summary></details><details><summary>Pro EM3 (gen2) - both triphase and monophase profiles</summary>**Triphase** ![triphase](images/device_page_pro3em_triphase.png) **Monophase** ![monophase](images/device_page_pro3em_monophase.png) </details>
+> **Important:** Some Shelly configuration changes, requires re-execution of the script. It might be change from switch to light, enabling position control by making a cover calibration or enabling slat control in Shelly settings.
+
+
+
+Compatibility with devices depends on components those devices implement. Tested with following devices (click on them for screenshots): <details><summary>Mini PM gen3</summary> ![screenshot xc](images/device_page_pmminigen3.png) </details><details><summary>Plus 1PM (gen2)</summary>![screenshot](images/device_page_pluspm.png)</details><details><summary>Plus 2PM (gen2) - as switch, light, cover incl. position and slat support</summary>
+**Cover device page:**
+![Cover page](images/device_page_pluspm_cover.png)
+
+**Double switch device page** (one switch in light mode):
+![Switch as light](images/device_page_overview.png)
+
+**Cover options:**
+<div>
+<picture><img src="images/device_page_pluspm_cover_simple1.png" alt="General controls" style="width:30%"></picture>
+<picture><img src="images/device_page_pluspm_cover_simple2.png" alt="General controls with slat" style="width:30%"></picture>
+<picture><img src="images/device_page_pluspm_cover_pos1.png" alt="Position controlst" style="width:30%"></picture>
+<picture><img src="images/device_page_pluspm_cover_pos2.png" alt="Position controls with slat" style="width:30%"></picture>
+</div>
+</details>
+
+<details><summary>Pro EM3 (gen2) - both triphase and monophase profiles</summary>**Triphase** ![triphase](images/device_page_pro3em_triphase.png) **Monophase** ![monophase](images/device_page_pro3em_monophase.png) </details>
 
 <sup>*)</sup> wifi component isn't originally repoted to MQTT. This script adds periodical reporting of Wifi component status to topic configured in MQTT configuration <details><summary>screenshot</summary> ![WIFI added to MQTT](images/mqtt_wifi.png) </details>
 <sup>**)</sup> Shelly devices report temperature only on temperature changes. Once temperature stabilizes, MQTT topic is not updated anymore. In conjunction with non-retained topic, it might lead to unknown value for long time, ie after HA restart or HA entity reinitialization.
@@ -40,8 +61,8 @@ Compatibility with devices depends on components those devices implemet. Tested 
 | Device Name                     | Components                         | Supported |
 | ------------------------------- | ---------------------------------- | ----------------- |
 | Shelly Plus 1 (Mini)            | switch                             | ✅                 |
-| Shelly Plus 1 PM (Mini)         | switch,                            | ✅  ✔️             |
-| Shelly Plus 2 PM                | switch,  cover                     | ☑️ ✔️ (switch only)  |
+| Shelly Plus 1 PM (Mini)         | switch,                            | ✅ ✔️             |
+| Shelly Plus 2 PM                | switch, cover                      | ✅ ✔️              |
 | Shelly Plus I4                  | input                              | ✅                 |
 | Shelly Plus Plug IT             | switch,                            | ✅                 |
 | Shelly Plus Plug S              | switch,                            | ✅                 |
@@ -57,10 +78,10 @@ Compatibility with devices depends on components those devices implemet. Tested 
 | Shelly Pro 1                    | switch                             | ✅                 |
 | Shelly Pro 1 PM                 | switch                             | ✅                 |
 | Shelly Pro 2                    | switch                             | ✅                 |
-| Shelly Pro 2 PM                 | switch, cover                      | ☑️ (switch only)   |
+| Shelly Pro 2 PM                 | switch, cover                      | ✅   |
 | Shelly Pro 3                    | switch                             | ✅                 |
 | Shelly Pro 4 PM                 | switch                             | ✅                 |
-| Shelly Pro Dual Cover PM        | cover                              |                    |
+| Shelly Pro Dual Cover PM        | cover                              | ✅                 |
 | Shelly Pro EM                   | switch, em1, em1data               | ✅                 |
 | Shelly Pro 3 EM (400)           | em, em1, emdata, em1data           | ✅ ✔️              |
 | Shelly Pro Dimmer 1 PM          | light                              |                   |
@@ -75,7 +96,7 @@ Compatibility with devices depends on components those devices implemet. Tested 
 | --------------------------- | ---------------------------------- | ----------------- |
 | Shelly 1                    | switch                             | ✅                 |
 | Shelly 1 PM                 | switch                             | ✅                 |
-| Shelly 2 PM                 | switch                             | ✅                 |
+| Shelly 2 PM                 | switch, cover                      | ✅                 |
 | Shelly I4 / I4DC            | input                              |                    |
 | Shelly 1 L                  | switch                             | ✅                 |
 | Shelly 2 L                  | switch                             | ✅                 |
@@ -92,7 +113,7 @@ Compatibility with devices depends on components those devices implemet. Tested 
 | Shelly 3 EM                 | em, em1data                        | ✅                 |
 | Shelly EM                   | em1, em1data                       | ✅                 |
 | Shelly BLU Gateway Gen3     | *(none)*                           |                    |
-| Shelly Shutter              | cover                      | |
+| Shelly Shutter              | cover                      | | ✅
 
 
 **Gen 4 devices**
@@ -104,19 +125,14 @@ Compatibility with devices depends on components those devices implemet. Tested 
 | Shelly 1 PM Mini | switch      | ✅                 |
 | Shelly 2 PM      | switch      | ✅                 |
 
-
-
-
-
 ### Features
 * easy to use: just run it
 * by default creates generic device and entity names (see Naming below)
-* device and entity names might be overriden by shelly device configuration (device name and channel names)
+* device and entity names might be taked from shelly configuration
 * switch can be reported as a light entity to HA (set `consumption type` to `light`)
 * some of sensors are disabled by default, for example power factor or voltage.
 * The script follows recent Home Assistant conventions in how to setup entities.
 * force MQTT refresh to selected components, incl. WiFi
-
 
 ![Device Page](images/device_page_overview.png)
 
