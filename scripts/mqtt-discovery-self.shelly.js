@@ -5,7 +5,7 @@ let CONFIG = {
   ignore_names: true,               // If true, device and channel names configured withing Shelly will not be used. Configure them in HA. It's less error prone approach
   
   report_ip: true,                  // create URL link to open Shelly GUI from HA
-  fake_macaddress: null,            // for testing purposes, set alternative macaddress
+  fake_macaddress: "",              // for testing purposes, set alternative macaddress
 
   discovery_topic: "homeassistant",
   mqtt_publish_pause: 500,          // (milliseconds) discovery entities will are published to MQTT entry-by-entry with pause inbeetween
@@ -321,22 +321,27 @@ function discoveryEntity(topic, info) {
       pload["unit_of_meas"] = getUnits(info.attr_common);
       break;
     case "cover":
-      let cfg = Shelly.getComponentConfig(info.topic).slat;
+      let slat = Shelly.getComponentConfig(info.topic).slat;
+      let pos = Shelly.getComponentStatus(info.topic).pos_control;
+
       pload["cmd_t"] = topic + "/command/" + info.topic;
-      pload["pos_t"] = topic + "/status/" + info.topic;
-      pload["pos_tpl"] = "{{ value_json.current_pos }}"
-      pload["set_pos_t"] = pload["cmd_t"];
-      pload["set_pos_tpl"] = "pos,{{ position }}";
       pload["pl_open"] = "open";
       pload["pl_stop"] = "stop";
-      
       pload["pl_cls"] = "close";
       pload["opt"] = false;
 
-      if (cfg && cfg.enable) {
+      if (pos) {
+        pload["pos_t"] = pload["stat_t"];
+        pload["pos_tpl"] = "{{ value_json.current_pos }}"
+        pload["set_pos_t"] = pload["cmd_t"];
+        pload["set_pos_tpl"] = "pos,{{ position }}";
+      }
+      
+      if (pos && slat && slat.enable) {
         pload["tilt_cmd_tpl"] = "slat_pos,{{ tilt_position }}";
         pload["tilt_cmd_t"] = pload["cmd_t"];
         pload["tilt_cmd_t"] = pload["pos_t"];
+        pload["tilt_status_t"] = pload["stat_t"];
         pload["tilt_status_tpl"] = "{{ value_json.slat_pos }}";
         pload["pl_stop_tilt"] = pload["pl_stop"];
         pload["tilt_opt"] = false;
