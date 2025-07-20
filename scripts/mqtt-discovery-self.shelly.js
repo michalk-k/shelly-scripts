@@ -14,11 +14,11 @@ let CONFIG = {
   components_refresh_period: 60     // (seconds) how often report components above to mqtt
 };
 
-const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "em1", "emdata", "em1data", "temperature", "cover",];
-const SUPPORTED_ATTRS = ["apower", "aprt_power", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature", "tC", "tF", "state"];
+const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "em1", "emdata", "em1data", "temperature", "cover", "humidity", "voltmeter"];
+const SUPPORTED_ATTRS = ["apower", "aprt_power", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature", "tC", "tF", "state", "rh", "xvoltage"];
 
 const CAT_DIAGNOSTIC = ["rssi","temperature"];
-const DISABLED_ENTS = ["pf", "voltage", "freq", "current", "ret_aenergy"];
+const DISABLED_ENTS = ["pf", "voltage", "freq", "current", "ret_aenergy", "xvoltage"];
 
 const ALIASES = {
   "a_current": "current",
@@ -60,12 +60,14 @@ const DEVCLASSES = {
   "apower": "power",
   "aprt_power": "apparent_power",
   "voltage": "voltage",
+  "xvoltage": null, // unknown, units given by Shelly configuration
   "freq": "frequency",
   "current": "current",
   "pf": "power_factor",
   "aenergy": "energy",
   "ret_aenergy": "energy",
   "temperature": "temperature",
+  "rh": "humidity",
   "switch": "switch", // from docs: possible none, switch, outlet
   "rssi": "signal_strength",
   "light": "light",
@@ -76,12 +78,14 @@ const NAMES = {
   "apower": "Active Power",
   "aprt_power": "Aparent Power",
   "voltage": "Voltage",
+  "xvoltage": "Transformed Voltage",
   "freq": "Frequency",
   "current": "Current",
   "pf": "Power Factor",
   "aenergy": "Active Energy",
   "ret_aenergy": "Returned Active Energy",
   "temperature": "Temperature",
+  "rh": "Humidity",
   "output": "Switch",
   "rssi": "RSSI",
   "light": "Light",
@@ -98,6 +102,7 @@ const UNITS = {
   "ret_aenergy": "Wh",
   "tC": "°C",
   "tF": "°F",
+  "rh": "%",
   "rssi": "dBm"
 }
 
@@ -105,6 +110,7 @@ const DOMAINS = {
   "apower": "sensor",
   "aprt_power": "sensor",
   "voltage": "sensor",
+  "xvoltage": "sensor",
   "freq": "sensor",
   "current": "sensor",
   "aenergy": "sensor",
@@ -115,7 +121,8 @@ const DOMAINS = {
   "output": "switch",
   "pf": "sensor",
   "rssi": "sensor",
-  "temperature": "sensor"
+  "temperature": "sensor",
+  "rh": "sensor"
   // switch and light matches domain name, not here to save memory
 }
 
@@ -177,16 +184,6 @@ function getValTpl(info) {
   if (info.attr == "output") return "{{ 'on' if value_json.output else 'off' }}";
   if (info.attr == "temperature") return "{{ value_json." + info.attr + ".t" + CONFIG.temperature_unit + " }}";
 
-  // switch (devclass) {
-  //   case "energy":
-  //     return "{{ value_json." + attr + ".total }}";
-  //   case "switch":
-  //   case "light":
-  //     return "{{ 'on' if value_json.output else 'off' }}";
-  //   case "temperature":
-  //     return "{{ value_json." + attr + ".t" + CONFIG.temperature_unit + " }}";
-  // }
-
   return "{{ value_json." + info.attr + " }}";
 }
 
@@ -205,13 +202,18 @@ function getUniqueId(info) {
  * Returns the unit of measurement for the given attribute.
  * If the attribute is temperature, it appends the configured temperature unit (C or F).
  * If the attribute is not recognized, it returns null.
- * @param {string} attr - Attribute name for which the unit is to be retrieved
+ * @param {object} info - Object with data
  * @returns {string|null} - Unit of measurement for the attribute, or null if not recognized
  */
-function getUnits(attr) {
-  if (attr == "temperature") attr = "t" + CONFIG.temperature_unit;
+function getUnits(info) {
+  
+  if (info.attr_common == "xvoltage") {
+    return Shelly.getComponentConfig(info.topic).xvoltage.unit;
+  }
+  let attr = info.attr_common;
+  if (info.attr_common == "temperature") attr = "t" + CONFIG.temperature_unit;
   if (UNITS[attr] === undefined) return null;
-  return UNITS[attr];
+  return UNITS[info.attr_common];
 }
 
 /**
@@ -318,7 +320,7 @@ function discoveryEntity(topic, info) {
       pload["pl_off"] = "off";
       break;
     case "sensor":
-      pload["unit_of_meas"] = getUnits(info.attr_common);
+      pload["unit_of_meas"] = getUnits(info);
       break;
     case "cover":
       let slat = Shelly.getComponentConfig(info.topic).slat;
