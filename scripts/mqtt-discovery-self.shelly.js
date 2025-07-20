@@ -321,15 +321,27 @@ function discoveryEntity(topic, info) {
       pload["unit_of_meas"] = getUnits(info.attr_common);
       break;
     case "cover":
+      let cfg = Shelly.getComponentConfig(info.topic).slat;
       pload["cmd_t"] = topic + "/command/" + info.topic;
       pload["pos_t"] = topic + "/status/" + info.topic;
       pload["pos_tpl"] = "{{ value_json.current_pos }}"
-      pload["set_pos_t"] = topic + "/command/" + info.topic;
+      pload["set_pos_t"] = pload["cmd_t"];
       pload["set_pos_tpl"] = "pos,{{ position }}";
       pload["pl_open"] = "open";
       pload["pl_stop"] = "stop";
-      pload["pl_close"] = "close";
+      
+      pload["pl_cls"] = "close";
       pload["opt"] = false;
+
+      if (cfg && cfg.enable) {
+        pload["tilt_cmd_tpl"] = "slat_pos,{{ tilt_position }}";
+        pload["tilt_cmd_t"] = pload["cmd_t"];
+        pload["tilt_cmd_t"] = pload["pos_t"];
+        pload["tilt_status_tpl"] = "{{ value_json.slat_pos }}";
+        pload["pl_stop_tilt"] = pload["pl_stop"];
+        pload["tilt_opt"] = false;
+      }
+
       break;
   }
 
