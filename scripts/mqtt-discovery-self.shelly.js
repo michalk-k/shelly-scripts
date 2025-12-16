@@ -420,6 +420,32 @@ function precollect() {
     }
   }
 
+  Shelly.call("SensorAddon.GetPeripherals", {}, function (res) {
+
+    for (let peripheral in res) {
+      // Check if first-level element has children
+      if (Object.keys(res[peripheral]).length == 0) continue
+
+        for (let scomp in res[peripheral]) {
+          let comparr = scomp.split(":");
+          
+          status = Shelly.getComponentStatus(scomp);
+
+          if (status === null) break;
+
+          for (let datattr in status) {
+            if (SUPPORTED_ATTRS.indexOf(getCommonAttr(datattr)) == -1) continue;
+            if (datattr == "tC" && CONFIG.temperature_unit != "C") continue;
+            if (datattr == "tF" && CONFIG.temperature_unit != "F") continue;
+            report_arr.push({comp : comparr[0], ix: comparr[1], attr: datattr, topic: scomp});
+          }
+
+          status = null;
+
+        }
+    }
+  });
+
 }
 
 /**
