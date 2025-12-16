@@ -13,6 +13,11 @@
     "fname": "scripts/mqtt-discovery-scr-mon.shelly.js",
     "title": "Create Entity Monitoring Shelly Scripts",
     "description": "This script creates new topic with composite data about script.\n\nThen, utilizing MQTT Discovery, it creates sensor entity that provides this data to Home Assistant."
+  },
+  {
+    "fname": "scripts/mqtt-periodic-pub.shelly.js",
+    "title": "MQTT Component Periodic Publisher",
+    "description": "This script republishes, at a configurable interval, the states of selected components to MQTT."
   }
   
 ]
