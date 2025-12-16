@@ -57,6 +57,8 @@ Compatibility with devices depends on components those devices implement. Tested
 
 ✔️ - tested by me
 
+Note, some components provide composite data, for example a switch, besides its state might provide energy and temperature.
+
 **Gen 2 devices**
 | Device Name                     | Components                         | Supported |
 | ------------------------------- | ---------------------------------- | ----------------- |
@@ -94,7 +96,7 @@ Compatibility with devices depends on components those devices implement. Tested
 **Gen 3 devices**
 | Device Name                 | Components                         | Supported |
 | --------------------------- | ---------------------------------- | ----------------- |
-| Shelly 1                    | switch                             | ✅                 |
+| Shelly 1                    | switch                             | ✅ ✔️              |
 | Shelly 1 PM                 | switch                             | ✅                 |
 | Shelly 2 PM                 | switch, cover                      | ✅                 |
 | Shelly I4 / I4DC            | input                              |                    |
@@ -124,6 +126,12 @@ Compatibility with devices depends on components those devices implement. Tested
 | Shelly 1 Mini    | switch      | ✅                 |
 | Shelly 1 PM Mini | switch      | ✅                 |
 | Shelly 2 PM      | switch      | ✅                 |
+
+**Add Ons**
+| Device Name      | Components  | Supported |
+| ---------------- | ----------- | ----------------- |
+| Shelly Plus Sensor | temperature, humidity, input, voltmeter      | ✅                 |
+| Shelly Pro Output | switch      | not tested                 |
 
 ### Features
 * easy to use: just run it
