@@ -1,8 +1,8 @@
 let CONFIG = {
 
   temperature_unit: "C",            // C or F - Uppercase!!!
-  disable_minor_entities: true,     // Some entities will be disabled by default (can be enabled later in HA), see DISABLED_ENTS
-  ignore_names: true,               // If true, device and channel names configured withing Shelly will not be used. Configure them in HA. It's less error prone approach
+  disable_minor_entities: true,     // Entities considered less unimportant will be disabled by default (can be enabled later in HA), see DISABLED_ENTS. It's not applied to addons entities
+  custom_names: false,              // If true, device and channel names configured within Shelly will be used. Otherwise generic names will be reported (possibly to change later on in HomeAssistant).
 
   report_ip: true,                  // create URL link to open Shelly GUI from HA
   fake_macaddress: "",              // for testing purposes, set alternative macaddress
@@ -159,7 +159,7 @@ function discoveryDevice(deviceInfo) {
   const macaddress = normalizeMacAddress(CONFIG.fake_macaddress ? CONFIG.fake_macaddress : deviceInfo.mac);
 
   let device = {};
-  device.name = deviceInfo.name && !CONFIG.ignore_names ? deviceInfo.name : macaddress + "-" + deviceInfo.app;
+  device.name = deviceInfo.name && CONFIG.custom_names ? deviceInfo.name : macaddress + "-" + deviceInfo.app;
   device.ids = [macaddress + ""];
   device.cns = [["mac", macaddress + ""]];
   device.mf = "Shelly"
@@ -369,12 +369,15 @@ function discoveryEntity(topic, info) {
       break;
   }
 
+  if (info.addon && domain == "sensor") {
+     pload["sug_dsp_prc"] = 2;
+  }
+
   if (!info.addon && CAT_DIAGNOSTIC.indexOf(info.attr_common) != -1) {
     pload["ent_cat"] = "diagnostic";
   }
 
-
-  if (CONFIG.disable_minor_entities && DISABLED_ENTS.indexOf(info.attr_common) != -1) {
+  if (!info.addon && CONFIG.disable_minor_entities && DISABLED_ENTS.indexOf(info.attr_common) != -1) {
     pload["en"] = "false";
   }
 
@@ -514,7 +517,7 @@ function mqttreport() {
     deviceInfo = null;
   }
 
-  if (!CONFIG.ignore_names) info.name = Shelly.getComponentConfig(info.topic).name;
+  if (CONFIG.custom_names) info.name = Shelly.getComponentConfig(info.topic).name;
   info.mac = device.cns[0][1];
   info.attr_common = getCommonAttr(info.attr);
   if (uidata.consumption_types && uidata.consumption_types[info.ix]) info.altdomain = uidata.consumption_types[info.ix];

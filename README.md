@@ -2,7 +2,7 @@
 
 To install, copy the source code of the script, then add to Shelly device using one of Shelly provided options.
 
-For your convenience, you can add following url to scripts source in your Shelly: 
+For your convenience, you can add following url to scripts source in your Shelly:
 ```
 https://raw.githubusercontent.com/michalk-k/shelly-scripts/main/manifest.json
 ```
@@ -27,10 +27,7 @@ Currently supports following SHelly components (they can be found in different S
 
 > **Important:** Some Shelly configuration changes, requires re-execution of the script. It might be change from switch to light, enabling position control by making a cover calibration or enabling slat control in Shelly settings.
 
-
-
-Compatibility with devices depends on components those devices implement. Tested with following devices (click on them for screenshots): <details><summary>Mini PM gen3</summary> ![screenshot xc](images/device_page_pmminigen3.png) </details><details><summary>Plus 1PM (gen2)</summary>![screenshot](images/device_page_pluspm.png)</details><details><summary>Plus 2PM (gen2) - as switch, light, cover incl. position and slat support</summary>
-**Cover device page:**
+Compatibility with devices depends on components those devices implement. Tested with following devices (click on them for screenshots): <details><summary>Mini PM gen3</summary>![screenshot xc](images/device_page_pmminigen3.png) </details><details><summary>Plus 1PM (gen2)</summary>![screenshot](images/device_page_pluspm.png)</details><details><summary>Plus 2PM (gen2) - as switch, light, cover incl. position and slat support</summary>**Cover device page:**
 ![Cover page](images/device_page_pluspm_cover.png)
 
 **Double switch device page** (one switch in light mode):
@@ -44,8 +41,23 @@ Compatibility with devices depends on components those devices implement. Tested
 <picture><img src="images/device_page_pluspm_cover_pos2.png" alt="Position controls with slat" style="width:30%"></picture>
 </div>
 </details>
+<details><summary>Pro EM3 (gen2) - both triphase and monophase profiles</summary>
 
-<details><summary>Pro EM3 (gen2) - both triphase and monophase profiles</summary>**Triphase** ![triphase](images/device_page_pro3em_triphase.png) **Monophase** ![monophase](images/device_page_pro3em_monophase.png) </details>
+**Triphase**
+![triphase](images/device_page_pro3em_triphase.png)
+
+**Monophase**
+![monophase](images/device_page_pro3em_monophase.png)
+</details>
+<details><summary>Add-ons</summary>Here are images from Addon Plus.
+
+**4 DS18B20**
+![4xDS18B20](images/device_page_s3_addon_ds18B20.png)
+
+**DHT22, digital and voltimeter inputs**
+![DHT22](images/device_page_s3_addon_dht22.png)
+</details>
+
 
 <sup>*)</sup> wifi component isn't originally repoted to MQTT. This script adds periodical reporting of Wifi component status to topic configured in MQTT configuration <details><summary>screenshot</summary> ![WIFI added to MQTT](images/mqtt_wifi.png) </details>
 <sup>**)</sup> Shelly devices report temperature only on temperature changes. Once temperature stabilizes, MQTT topic is not updated anymore. In conjunction with non-retained topic, it might lead to unknown value for long time, ie after HA restart or HA entity reinitialization.
@@ -130,7 +142,7 @@ Note, some components provide composite data, for example a switch, besides its 
 **Add Ons**
 | Device Name      | Components  | Supported |
 | ---------------- | ----------- | ----------------- |
-| Shelly Plus Sensor | temperature, humidity, input, voltmeter      | ✅                 |
+| Shelly Plus Sensor | temperature, humidity, input, voltmeter      | ✅ ✔️                |
 | Shelly Pro Output | switch      | not tested                 |
 
 ### Features
