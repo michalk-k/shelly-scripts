@@ -17,7 +17,7 @@ let CONFIG = {
 };
 
 const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "em1", "emdata", "em1data", "temperature", "cover", "humidity", "voltmeter"];
-const SUPPORTED_ATTRS = ["apower", "aprt_power", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature", "tC", "tF", "state", "rh", "xvoltage"];
+const SUPPORTED_ATTRS = ["apower", "aprt_power", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature", "tC", "tF", "state", "rh", "xvoltage", "percent", "xpercent"];
 
 const CAT_DIAGNOSTIC = ["rssi","temperature"];
 const DISABLED_ENTS = ["pf", "voltage", "freq", "current", "ret_aenergy", "xvoltage"];
@@ -74,6 +74,8 @@ const DEVCLASSES = {
   "rssi": "signal_strength",
   "light": "light",
   "state": null,
+  "percent": null,
+  "xpercent": null
 }
 
 const NAMES = {
@@ -93,7 +95,9 @@ const NAMES = {
   "rssi": "RSSI",
   "light": "Light",
   "cover.state": "Cover",
-  "state": "Input"
+  "state": "Binary Input",
+  "percent": "Analog Input",
+  "xpercent": "Analog Input Transformed"
 }
 
 const UNITS = {
@@ -107,7 +111,8 @@ const UNITS = {
   "tC": "°C",
   "tF": "°F",
   "rh": "%",
-  "rssi": "dBm"
+  "rssi": "dBm",
+  "percent": "%"
 }
 
 const DOMAINS = {
@@ -127,7 +132,9 @@ const DOMAINS = {
   "pf": "sensor",
   "rssi": "sensor",
   "temperature": "sensor",
-  "rh": "sensor"
+  "rh": "sensor",
+  "percent": "sensor",
+  "xpercent": "sensor"
   // switch and light matches domain name, not here to save memory
 }
 
@@ -215,6 +222,10 @@ function getUnits(info) {
   if (info.attr_common == "xvoltage") {
     return Shelly.getComponentConfig(info.topic).xvoltage.unit;
   }
+  if (info.attr_common == "xpercent") {
+    return Shelly.getComponentConfig(info.topic).xpercent.unit;
+  }
+
   let attr = info.attr_common;
 
   if (info.attr_common == "temperature") attr = "t" + CONFIG.temperature_unit;
@@ -242,7 +253,7 @@ function getName(info) {
   if (NAMES[key]) name = NAMES[key];
   else name = key;
 
-  if (info.name) name = info.name;
+  if (info.name) name = info.name + " " + name;
   else if (info.addon) name = "Addon " + name + " " + (info.ix-99);
   else if (info.ix >= 0 && !info.issingle) name = name + " " + (info.ix+1);
 
@@ -373,12 +384,12 @@ function discoveryEntity(topic, info) {
      pload["sug_dsp_prc"] = 2;
   }
 
-  if (!info.addon && CAT_DIAGNOSTIC.indexOf(info.attr_common) != -1) {
+  if (info.forcediagnostic || (!info.addon && CAT_DIAGNOSTIC.indexOf(info.attr_common) != -1)) {
     pload["ent_cat"] = "diagnostic";
   }
 
-  if (!info.addon && CONFIG.disable_minor_entities && DISABLED_ENTS.indexOf(info.attr_common) != -1) {
-    pload["en"] = "false";
+  if (info.forcehidden || (!info.addon && CONFIG.disable_minor_entities && DISABLED_ENTS.indexOf(info.attr_common) != -1)) {
+    pload["en"] = false;
   }
 
   return { "domain": domain, "subtopic": info.topic.split(":").join("") + "-" + info.attr, "data": pload }
@@ -386,7 +397,7 @@ function discoveryEntity(topic, info) {
 
 let report_arr = [];
 let report_arr_idx = 0;
-let comp_inst_num = {};
+let comp_inst_num = {}; // number of components of the same type, ie switch:0, switch:1 etc
 let device;
 let devicemqtttopic = Shelly.getComponentConfig("mqtt").topic_prefix;
 let uidata = Shelly.getComponentConfig("sys").ui_data;
@@ -521,6 +532,11 @@ function mqttreport() {
   info.mac = device.cns[0][1];
   info.attr_common = getCommonAttr(info.attr);
   if (uidata.consumption_types && uidata.consumption_types[info.ix]) info.altdomain = uidata.consumption_types[info.ix];
+  if ((info.attr_common == "percent" && Shelly.getComponentConfig(info.topic).xpercent !== undefined)
+      || (info.attr_common == "voltage" && Shelly.getComponentConfig(info.topic).xvoltage !== undefined)) {
+    info.forcediagnostic = true;
+    info.forcehidden = true;
+  }
 
   info.issingle = comp_inst_num[info.comp] == 1;
 
@@ -546,13 +562,10 @@ let discoverytimer;
  * This will also set up a timer to publish one collected entity per per time-period.
  * @returns
  */
-function main() {
+function onMQTTConnected() {
   precollect();
   discoverytimer = Timer.set(CONFIG.mqtt_publish_pause, true, mqttreport);
 }
-
-main();
-
 
 
 /***************************************
@@ -576,3 +589,32 @@ function reportWifiToMQTT() {
 // This will also set up a timer to report WiFi status every 60 seconds
 reportWifiToMQTT();
 let timer_handle = Timer.set(CONFIG.components_refresh_period * 1000, true, reportWifiToMQTT, null);
+
+// MQTT.setConnectHandler(onMQTTConnected);
+
+
+let mqttConnected = false;
+Shelly.addEventHandler(function (event) {
+  if (
+    event.component === "sys" &&
+    event.event === "mqtt"
+  ) {
+    if (event.info.connected && !mqttConnected) {
+      mqttConnected = true;
+      onMQTTConnected();
+    }
+
+    if (!event.info.connected) {
+      mqttConnected = false;
+    }
+  }
+});
+Shelly.call("MQTT.GetStatus", {}, function (res) {
+  mqttConnected = res.connected;
+
+  if (mqttConnected) {
+    // Treat script start while already connected
+    onMQTTConnected();
+  }
+});
+
