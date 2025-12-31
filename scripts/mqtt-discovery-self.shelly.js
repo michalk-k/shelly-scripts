@@ -2,7 +2,11 @@ let CONFIG = {
 
   temperature_unit: "C",            // C or F - Uppercase!!!
   disable_minor_entities: true,     // Entities considered less unimportant will be disabled by default (can be enabled later in HA), see DISABLED_ENTS. It's not applied to addons entities
-  custom_names: false,              // If true, device and channel names configured within Shelly will be used. Otherwise generic names will be reported (possibly to change later on in HomeAssistant).
+  custom_names: {                   // Use custom names from Shelly configuration, for:
+    device: true,                   // shelly device
+    channels: true,                 // shelly device channels
+    addons: true                    // addon channels
+  },              
 
   report_ip: true,                  // create URL link to open Shelly GUI from HA
   fake_macaddress: "",              // for testing purposes, set alternative macaddress
@@ -95,9 +99,9 @@ const NAMES = {
   "rssi": "RSSI",
   "light": "Light",
   "cover.state": "Cover",
-  "state": "Binary Input",
-  "percent": "Analog Input",
-  "xpercent": "Analog Input Transformed"
+  "state": "Binary In",
+  "percent": "Analog In",
+  "xpercent": "Analog In Transformed"
 }
 
 const UNITS = {
@@ -166,7 +170,7 @@ function discoveryDevice(deviceInfo) {
   const macaddress = normalizeMacAddress(CONFIG.fake_macaddress ? CONFIG.fake_macaddress : deviceInfo.mac);
 
   let device = {};
-  device.name = deviceInfo.name && CONFIG.custom_names ? deviceInfo.name : macaddress + "-" + deviceInfo.app;
+  device.name = deviceInfo.name && CONFIG.custom_names.device ? deviceInfo.name : macaddress + "-" + deviceInfo.app;
   device.ids = [macaddress + ""];
   device.cns = [["mac", macaddress + ""]];
   device.mf = "Shelly"
@@ -190,11 +194,11 @@ function discoveryDevice(deviceInfo) {
   * @returns {string} - template string for extracting value from MQTT message
   */
 function getValTpl(info) {
-  let devclass = getDeviceClass(info.attr);
 
   if (info.attr == "aenergy") return "{{ value_json." + info.attr + ".total }}";
   if (info.attr == "output") return "{{ 'on' if value_json.output else 'off' }}";
   if (info.attr == "temperature") return "{{ value_json." + info.attr + ".t" + CONFIG.temperature_unit + " }}";
+  if (info.attr == "state") return "{{ value_json." + info.attr + " if value_json." + info.attr + " else false }}";
 
   return "{{ value_json." + info.attr + " }}";
 }
@@ -402,12 +406,22 @@ let device;
 let devicemqtttopic = Shelly.getComponentConfig("mqtt").topic_prefix;
 let uidata = Shelly.getComponentConfig("sys").ui_data;
 
+function initGlobals() {
+  report_arr = [];
+  report_arr_idx = 0;
+  comp_inst_num = {}; // number of components of the same type, ie switch:0, switch:1 etc
+  devicemqtttopic = Shelly.getComponentConfig("mqtt").topic_prefix;
+  uidata = Shelly.getComponentConfig("sys").ui_data;
+}
+
 /**
  * Precollects input information needed for creation of MQTT discovery.
  *
  * Data are stored into array, making it possible to track the progress and resume with subsequent Timer calls.
  */
 function precollect() {
+
+  initGlobals();
   let status;
 
   for (let t = 0; t < COMPONENT_TYPES.length; t++) {
@@ -511,12 +525,11 @@ function mqttreport() {
     Timer.clear(discoverytimer);
     mqttForceInitialData();
     report_arr = null;
-    report_arr_idx = null;
+    report_arr_idx = 0;
     comp_inst_num = null;
     device = null;
     devicemqtttopic = null;
     uidata = null;
-
 
     return;
   }
@@ -528,12 +541,15 @@ function mqttreport() {
     deviceInfo = null;
   }
 
-  if (CONFIG.custom_names) info.name = Shelly.getComponentConfig(info.topic).name;
+  if (CONFIG.custom_names.channels && !info.addons || CONFIG.custom_names.addon && info.addons) {
+    info.name = Shelly.getComponentConfig(info.topic).name;
+  }
+
   info.mac = device.cns[0][1];
   info.attr_common = getCommonAttr(info.attr);
   if (uidata.consumption_types && uidata.consumption_types[info.ix]) info.altdomain = uidata.consumption_types[info.ix];
-  if ((info.attr_common == "percent" && Shelly.getComponentConfig(info.topic).xpercent !== undefined)
-      || (info.attr_common == "voltage" && Shelly.getComponentConfig(info.topic).xvoltage !== undefined)) {
+  if ((info.attr_common == "percent" && Shelly.getComponentConfig(info.topic).xpercent.expr !== null)
+      || (info.attr_common == "voltage" && !Shelly.getComponentConfig(info.topic).xvoltage.expr !== null)) {
     info.forcediagnostic = true;
     info.forcehidden = true;
   }
@@ -590,25 +606,30 @@ function reportWifiToMQTT() {
 reportWifiToMQTT();
 let timer_handle = Timer.set(CONFIG.components_refresh_period * 1000, true, reportWifiToMQTT, null);
 
-// MQTT.setConnectHandler(onMQTTConnected);
-
 
 let mqttConnected = false;
-Shelly.addEventHandler(function (event) {
-  if (
-    event.component === "sys" &&
-    event.event === "mqtt"
-  ) {
-    if (event.info.connected && !mqttConnected) {
+
+// Report Discovery on MQTT connection
+MQTT.setConnectHandler(
+    function () {
+      if (mqttConnected) return;
       mqttConnected = true;
       onMQTTConnected();
     }
+);
 
-    if (!event.info.connected) {
-      mqttConnected = false;
+// Report Discovery on Shelly config Change
+Shelly.addEventHandler(
+    function (event) {
+        // while we don't have better selectivity for event source
+        if (typeof (event) === 'undefined') return;
+        if (event.info.event == "config_changed" && !event.info.restart_required) {
+          onMQTTConnected();
+        }
     }
-  }
-});
+);
+
+// Report Discovery on the script start
 Shelly.call("MQTT.GetStatus", {}, function (res) {
   mqttConnected = res.connected;
 
