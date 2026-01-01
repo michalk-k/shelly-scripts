@@ -6,7 +6,7 @@ let CONFIG = {
     device: true,                   // shelly device
     channels: true,                 // shelly device channels
     addons: true                    // addon channels
-  },              
+  },
 
   report_ip: true,                  // create URL link to open Shelly GUI from HA
   fake_macaddress: "",              // for testing purposes, set alternative macaddress
@@ -86,7 +86,7 @@ const NAMES = {
   "apower": "Active Power",
   "aprt_power": "Aparent Power",
   "voltage": "Voltage",
-  "xvoltage": "Transformed Voltage",
+  "xvoltage": "X-Voltage",
   "freq": "Frequency",
   "current": "Current",
   "pf": "Power Factor",
@@ -99,9 +99,9 @@ const NAMES = {
   "rssi": "RSSI",
   "light": "Light",
   "cover.state": "Cover",
-  "state": "Binary In",
-  "percent": "Analog In",
-  "xpercent": "Analog In Transformed"
+  "state": "BinaryIn",
+  "percent": "AnalogIn",
+  "xpercent": "X-AnalogIn"
 }
 
 const UNITS = {
@@ -501,6 +501,7 @@ function mqttPublishComponentData(component) {
     MQTT.publish(topic_prefix + "/status/" + component, JSON.stringify(status), 1, false);
 }
 
+// Publish data of collected components right after discovery is done
 function mqttForceInitialData() {
   if (!CONFIG.publish_init_data) return;
 
