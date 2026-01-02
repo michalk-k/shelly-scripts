@@ -20,7 +20,7 @@ let CONFIG = {
   components_refresh_period: 60     // (seconds) how often report components above to mqtt
 };
 
-const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "em1", "emdata", "em1data", "temperature", "cover", "humidity", "voltmeter"];
+const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "em1", "emdata", "em1data", "temperature", "cover", "humidity", "voltmeter", "input"];
 const SUPPORTED_ATTRS = ["apower", "aprt_power", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature", "tC", "tF", "state", "rh", "xvoltage", "percent", "xpercent"];
 
 const CAT_DIAGNOSTIC = ["rssi","temperature"];
@@ -531,7 +531,7 @@ function mqttreport() {
     device = null;
     devicemqtttopic = null;
     uidata = null;
-
+    isProcessing = false;
     return;
   }
 
@@ -569,9 +569,11 @@ function mqttreport() {
 }
 
 /**
- * MQTT Discovery timer object
+ * Execution control variables
  */
 let discoverytimer;
+let mqttConnected = false;
+let isProcessing = false;
 
 /**
  *  Generate MQTT Discovery
@@ -580,7 +582,9 @@ let discoverytimer;
  * @returns
  */
 function onMQTTConnected() {
-  precollect();
+  if (isProcessing) return;
+  isProcessing = true;
+  precollect(); 
   discoverytimer = Timer.set(CONFIG.mqtt_publish_pause, true, mqttreport);
 }
 
@@ -608,7 +612,7 @@ reportWifiToMQTT();
 let timer_handle = Timer.set(CONFIG.components_refresh_period * 1000, true, reportWifiToMQTT, null);
 
 
-let mqttConnected = false;
+
 
 // Report Discovery on MQTT connection
 MQTT.setConnectHandler(

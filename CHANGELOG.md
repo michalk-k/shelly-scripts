@@ -1,6 +1,7 @@
 # Changelog
 
 ## W.I.P.
+* Added inputs (note, shelly doesn't report device inputs in button mode; unlike addon binary inputs)
 * Added option to publish data entities data just after discovery (to avoid unavailable/unknown states)
 * Added publishing data on MQTT connect and Shelly config change (ie channel name change)
 * Added support for periferals (addon sensor)
