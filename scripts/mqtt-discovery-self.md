@@ -12,10 +12,10 @@ It creates entities for all supported properties: switches, sensors etc.
 * Can utilize Shelly's device and channel names
 * Less important sensors are disabled by default, for example power factor
 * The script follows recent Home Assistant conventions in entities configuration. Read [Naming](#naming) section for details
-* provides periodic components refresh, ie for WiFi
+* provides periodic components refresh, ie for WiFi (RSSI) that is not reported by Shelly devices at all.
 * Supports custom formulas and units (xvoltage, xpercentage)
 * Re-publishes discovery data on Shelly configuration change or MQTT reconnect.
-* Re-publishes Shelly data after discovery to avoid unknown values until first change come.
+* Re-publishes Shelly data after discovery to avoid unknown values until the first value change comes.
 
 ## Requirements
 
@@ -23,7 +23,7 @@ It creates entities for all supported properties: switches, sensors etc.
 
 ## Installation and Configuration
 
-For instalation, read the [Installation](../README.md#installation) section. 
+For instalation, read the [Installation](../README.md#installation) section.
 
 **Configuration parameters**
 
@@ -42,13 +42,13 @@ While valid for most cases, it still provides option to change some settings.
 | `publish_init_data` | `true` | Ask Shelly to publish data to MQTT when the Discovery is completted.  With `false` all entities remains in unavailable state as long as values do not change. It helps to receive current states immediatelty after the Discovery |
 | `discovery_topic` | `"homeassistant"` | MQTT discovery topic |
 | `mqtt_publish_pause` | `500` | [Milliseconds] Discovery data publishing hsa to be slowed down due to Shelly limitations. This is the pause added to every entry publication |
-| `components_refresh` | `["wifi", "temperature:0"]` | Components to periodically refresh. See content of `<mqtt_topic>/status` topic, for reported devices.  The `<mqtt_topic>` topic is configured in MQTT settings of Shelly device.  |
+| `components_refresh` | `["wifi", "temperature:0"]` | List of components, their data will be periodically refreshed in MQTT. Wifi (this RSSI) is not reported by Shelly at all. Switch temperatures are reported only on switch state change. This setting helps to get these data.<br><br>For exact names of components look at `<mqtt_topic>/status` topic. These topics are not retained so you have to wait for the first change reported to see these topics.<br>The `<mqtt_topic>` topic is configured in MQTT settings of Shelly device.  |
 | `components_refresh_period` | `60` | [Seconds] Frequency of publishing selected components data |
 
 
 ## Compatibility
 
-Currently supports following **Shelly Components** (they are building blocks of Shelly devices):
+The script supports following **Shelly Components** (they are building blocks of Shelly devices):
 * switch (can be reported as a light)
 * cover (incl. position and slat if enabled)
 * pm1
@@ -64,6 +64,11 @@ Currently supports following **Shelly Components** (they are building blocks of 
 
 <sup>**) Shelly devices report temperature only on temperature changes. Once the temperature stabilizes, the MQTT topic is not updated anymore. In conjunction with non-retained topic, it might lead to an unknown value for a long time.</sup>
 
+Note, some components provide not only data related to component name. In addition they may report other values. For example the Switch component, reports switch state, power, energy, voltage, current, power factor and frequency.
+
+
+## Supported devices
+
 Compatibility with devices depends on the components that those devices implement. Tested with the following devices:
 
 * Shelly 1 gen3
@@ -73,14 +78,13 @@ Compatibility with devices depends on the components that those devices implemen
 * Shelly Pro EM3 (gen2) - both triphase and monophase profiles
 * Addon Plus - with 4xDS18B20, DHT22, binary, analog and voltimeter inputs
 
-## Supported devices
-✅ - confirmed by comparison of components implemented in the script
 
-☑️ - as above, but support is limited to subset of available device profiles.
+The table below shows *potential* compatibility with devices:
 
-✔️ - tested by me
-
-Note, some components provide composite data, for example a switch, besides its state might provide energy and temperature.
+✅ - Confirmed by comparison of components supported by the the script\
+☑️ - As above, but some components are not yet supported.
+✔️ - Tested by me\
+🔋 - Cannot confirm how it works with battery powered device
 
 **Gen 2 devices**
 | Device Name                     | Components                         | Supported |
@@ -93,7 +97,7 @@ Note, some components provide composite data, for example a switch, besides its 
 | Shelly Plus Plug S              | switch,                            | ✅                 |
 | Shelly Plus Plug UK             | switch,                            | ✅                 |
 | Shelly Plus Plug US             | switch,                            | ✅                 |
-| Shelly Plus H & T               | humidity, temperature, devicepower |                   |
+| Shelly Plus H & T               | humidity, temperature, devicepower | ☑️🔋                  |
 | Shelly Plus Smoke               | smoke                              |                   |
 | Shelly Plus WallDimmer          | light                              |                   |
 | Shelly Plus RGBW PM             | light, rgb, rgbw                   |                   |
@@ -122,7 +126,7 @@ Note, some components provide composite data, for example a switch, besides its 
 | Shelly 1                    | switch                             | ✅ ✔️              |
 | Shelly 1 PM                 | switch                             | ✅                 |
 | Shelly 2 PM                 | switch, cover                      | ✅                 |
-| Shelly I4 / I4DC            | input                              |                    |
+| Shelly I4 / I4DC            | input                              | ✅                 |
 | Shelly 1 L                  | switch                             | ✅                 |
 | Shelly 2 L                  | switch                             | ✅                 |
 | Shelly 1 Mini               | switch                             | ✅                 |
@@ -134,11 +138,11 @@ Note, some components provide composite data, for example a switch, besides its 
 | Shelly Dimmer 0/1 – 10 V PM | light                              |                    |
 | Shelly Dimmer               | light                              |                    |
 | Shelly D Dimmer             | light                              |                    |
-| Shelly H & T                | humidity, temperature, devicepower |                    |
+| Shelly H & T                | humidity, temperature, devicepower | ☑️🔋  |
 | Shelly 3 EM                 | em, em1data                        | ✅                 |
 | Shelly EM                   | em1, em1data                       | ✅                 |
 | Shelly BLU Gateway Gen3     | *(none)*                           |                    |
-| Shelly Shutter              | cover                      | | ✅
+| Shelly Shutter              | cover                      | ✅ |
 
 
 **Gen 4 devices**
@@ -154,30 +158,84 @@ Note, some components provide composite data, for example a switch, besides its 
 | Device Name      | Components  | Supported |
 | ---------------- | ----------- | ----------------- |
 | Shelly Plus Sensor | temperature, humidity, input, voltmeter      | ✅ ✔️                |
-| Shelly Pro Output | switch      | not tested                 |
+| Shelly Pro Output | switch      | hard to say              |
 
-## Home Assistant Internals
+## Home Assistant Specifics
 
 ### Naming
 
-**Device**
+#### Device
 
-The device name follows the pattern: : `macaddress-modelname`, for example `b8d6xxxxxxxx-Plus2PM`.\
-It can be overriden by setting Device name (Settings / Device Name). To apply changes, the script must be restarted
+The device name follows the pattern:\
+`<macaddress>-<modelname>`
 
-> Note, the Home Assistant uses device name as a prefix for entity names. Changing device when entities are already registered, affect no entity names
+example: `b8d6xxxxxxxx-Plus2PM`.
 
-**Entities**
+The `custom_names.device` script option is set to `true` (default) allows to override the default device name with a device name set in Shelly configuration. It can be found `Settings / Device Name`.
 
-By default **entity name** follows the tracked attribute function, for example: `Switch`, `Frequency`, `Power Factor`, `RSSI`. If the device contains more components of the same type (ie measurement channels), the names are suffixed by oridinal numbers, for example `Switch 1`, `Switch 2`, `Frequency 1`, `Frequency 2`, etc.
+> Note, the Home Assistant uses device name as a prefix for entity names. However changing device name when entities are already registered, affect NO entity names.
 
-If device channel has a custom name configured (as for example, `Output -> Name` in Shelly2PM), all related entity names gets name as follows: `Custom Name Function`, For example `Dryer Socket Frequency`. in this case the oridinal number of Shelly component is not appended.
+#### Entities
 
-The **friendly_name** is created by Home Assistant from the device name and the entity name. It might look like `b8d6xxxxxxxx-Plus2PM Active Power 2` or `b8d6xxxxxxxx-Plus2PM Backlight`. Looks horrible, but once device name is changed to something meaningfull, ie AlcoveLight, the friendly name will turn into `AlcoveLight Active Power 2` or `AlcoveLight Backlight` respectively.
+##### Entity Name
+The entity name follows the tracked attribute function, for example: `Switch`, `Frequency`, `Power Factor`, `RSSI`. If the device contains more components of the same type (ie measurement channels), the names are suffixed by oridinal numbers, for example `Switch 1`, `Switch 2`, `Frequency 1`, `Frequency 2`, etc. The numbers come from component identifiers, being considered as fixed.
 
-The **unique_id** allways follows the pattern: `macaddress-function` or `macaddress-function-number`, for example `macaddress-rssi` or `b8d6xxxxxxxx_power_factor_1`. Unique id never changes and is not influenced by configuration settings.
+Several patterns might be applied for name creation, depending whether entity represents a device component, addon component, there are more components etc.
 
-The **entity_id** is not set by this script. The entity name is generated by Home Assistant from `device_name_entity_name` pattern, for example `sensor.b8d61a89xxxx_plus2pm_active_energy_2`. The `entity_id` may be influenced by the Device name set in Shelly configuration or changed later on in Home Assistant.
+Examples for device components:\
+`<function>`, ie `Switch` - for single switch in the device\
+`<function> N`, ie `Switch 1`, `Switch 2` - for multiple switches in the device\
+`<customname> <function>`, ie `My Room Switch`, `Pantry Switch` - for two custom named switches\
+
+Entities reflecting an Addon components are prefixed by Addon word, as well as are numbered by number comming from the Shelly addon component identificator.
+
+Examples for add-on components:\
+`Addon <function> N`, ie `Addon Humidity 1`
+
+**Custom channel names**
+
+Shelly devices offer option to set up names for channels: for device channels as well as addon ones. It can be found various sections of settings: `Output -> Name`, `Input -> Name`, `Addons -> channel -> Name`.\
+If `custom_names.channels`, respectively `custom_names.addons` are set to `true`, then these custom names will be taken for entity name creation, skipping prefixes and suffix numbers.
+
+Examples using custom names:\
+`<customname> <function>`, ie `My Room Temperature`, `My Room Humidity`
+
+Note, there is no prefix nor numeric suffixes in the name. But functionality is still reflected. That's needed in case that a channel reports several values (switch, temperature, voltage).
+
+##### Friendly Name
+
+The Home Assistant creates friendly name joinin device name and entity name. The general patterns is:\
+`<device name> <entity name>`
+
+Depending custom names usage, it might look like:\
+`b8d6xxxxxxxx-Plus2PM Backlight`\
+`b8d6xxxxxxxx-Plus2PM Active Power 2`\
+`AlcoveLight Active Power 2`\
+`AlcoveLight Backlight`
+
+> Note you can change the friendly name in entity settings in Home Assistant. It takes precedence.
+
+##### Unique_ID
+
+The **unique_id** allways follows the pattern: \
+`<macaddress>-<function>` or\
+`<macaddress-function-number>`
+
+Examples:\
+`b8d6xxxxxxxx_power_factor_1`\
+`b8d6xxxxxxxx_rssi`
+
+> **Unique id never changes and is not influenced by configuration settings.**
+
+##### Entity_ID
+
+The **entity_id** is not set by this script. The entity name is generated by Home Assistant from the slug of:\
+`<device_name>_<entity_name>`
+
+Example:\
+`sensor.b8d61a89xxxx_plus2pm_active_energy_2`
+
+The `entity_id` may be influenced by the Device name set in Shelly configuration or changed later on in Home Assistant.
 
 ### Alternative Device Class
 It's often useful to have a switch interpreted by Home Assistant as a light.
@@ -188,4 +246,18 @@ Shelly devices allows to enter this information into `(Output Settings -> Consum
 
 > Currently only `light` as alternative device class is supported
 
-Note, that the change neither influences `unique_id`, `entity_id` or mqtt topic names. But it will change the `entity name` and `friendly name` of the entity.
+Note, that the change neither influences `unique_id`, name part of `entity_id` or mqtt topic names. But it will affect the `entity name`, `friendly name` as well as domain of the entity.
+
+### Disabling entities by default
+
+Some measurements are commonly less valuable than others. For example, voltage, provided by all switches in the house would be the same. Tracking voltage from every single Shelly devices might not be useful.
+
+Because of that I've decided to report such entities as disabled by default. Such entities can be enabled in Home Assistant at any time.
+
+Following reported params will cause entity to be disabled by default: `pf`, `voltage`, `freq`, `current`, `ret_aenergy`.
+
+### Diagnostic Category
+
+Some values is easy to define as belonging to diagnostic category. Such entities will be reported this way to Home Assistant. There are `rssi` and `temperature`, but only if not comming from add-ons. Addons values are always reported as measurement.
+
+There is one more situation to mention. Voltimetr and analog inputs (percentage) allows to set up a formula and units. In this case, original entity (volts or %) will be moved to diagnostics category and disabled. The new entities will be created based on values comming from the custom formula.
