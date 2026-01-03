@@ -511,6 +511,7 @@ function mqttForceInitialData() {
   }
 }
 
+
 /**
  * Processes the next entity in `report_arr` (using `report_arr_idx`), constructs its MQTT discovery payload, and publishes it to the appropriate MQTT discovery topic.
  * @returns
@@ -558,11 +559,21 @@ function mqttreport() {
   info.issingle = comp_inst_num[info.comp] == 1;
 
   let data = discoveryEntity(devicemqtttopic, info);
-  let discoveryTopic = CONFIG.discovery_topic + "/" + data.domain + "/" + info.mac + "/" + data.subtopic + "/config";
   data.data.dev = device;
 
-  MQTT.publish(discoveryTopic, "", 1, true);
-  MQTT.publish(discoveryTopic, JSON.stringify(data.data), 1, true);
+  let doms;
+
+  if (["switch","light", "cover"].indexOf(data.domain) >= 0) doms = ["switch","light", "cover"]
+  else doms = [data.domain];
+
+  for (let dom of doms) {
+    let discoveryTopic  = CONFIG.discovery_topic + "/" + dom + "/" + info.mac + "/" + data.subtopic + "/config";
+    MQTT.publish(discoveryTopic, "", 1, true);
+
+    if (dom == data.domain) {
+      MQTT.publish(discoveryTopic, JSON.stringify(data.data), 1, true);
+    }
+  }
 
   data = null;
   info = null;
