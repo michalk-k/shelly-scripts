@@ -19,7 +19,8 @@ It creates entities for all supported properties: switches, sensors, etc.
 
 ## Requirements
 
-> Requires the MQTT to be enabled and configured in the Shelly device.
+1. Shelly gen2, gen3 or gen4 device
+1. The MQTT has to be configured and enabled in the Shelly device.
 
 ## Installation and Configuration
 
@@ -261,3 +262,37 @@ Following reported params will cause entity to be disabled by default: `pf`, `vo
 Some values are easy to define as belonging to a diagnostic category. Such entities will be reported this way to Home Assistant. There are `rssi` and `temperature`, but only if not coming from add-ons. Addon values are always reported as measurements.
 
 There is one more situation to mention. Voltimetr and analog inputs (percentage) allows to set up a formula and units. In this case, the original entity (volts or %) will be moved to the diagnostics category and disabled. The new entities will be created based on values coming from the custom formula.
+
+## Q&As
+
+<details><summary>
+After Home Assistant (or the MQTT broker) restarts, all entities become unavailable.</summary>
+
+---
+
+This is a known issue and is **not related to this script**.
+
+Gen2+ Shelly devices publish their data to MQTT topics **without the RETAIN flag set**. As a result, after connecting to MQTT, these topics do not exist until new data is published.
+
+Fortunately, all Shelly devices connected to MQTT listen to the `shellies/command` topic. This topic can be used to request all Shelly devices to republish their current state.
+
+Below is a Home Assistant script that does exactly that:
+
+```yaml
+alias: Shellies Re-Announce
+description: Asks Shelies to republish their states on HA or MQTT restart
+triggers:
+  - trigger: homeassistant
+    event: start
+  - trigger: event
+    event_type: event_mqtt_reloaded
+actions:
+  - delay: 10
+  - action: mqtt.publish
+    data:
+      payload: announce
+      topic: shellies/command
+mode: single
+```
+---
+</details>

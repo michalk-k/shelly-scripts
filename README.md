@@ -20,14 +20,14 @@ There are several methods how to install scripts.
 ---
 
 1. In this GIT repository
-   1. enter scripts directory
+   1. enter [scripts](./scripts) directory
    1. select the script
    1. press Copy Raw File button
 1. Open Shelly GUI
-   1. Select Scripts from menu
+   1. Select `Scripts` from menu
    1. Create new script (or open existing one)
    1. Paste copied script
-   1. Run it, optionally mark as Run at Startup
+   1. Run it, optionally mark as `Run at Startup`
 
 ---
 </details>
@@ -36,15 +36,12 @@ There are several methods how to install scripts.
 
 ---
 
-
-
-
 1. Open Shelly GUI
    1. Select Scripts from menu
    1. press the `Library` button
    1. Enter URL listed below into `Configure URL` field. It will list all my scripts
    1. Pick one you want to install. it will create new script
-   1. Run it, optionally mark as Run at Startup
+   1. Run it, optionally mark as `Run at Startup`
 
 ```
 https://raw.githubusercontent.com/michalk-k/shelly-scripts/main/manifest.json
