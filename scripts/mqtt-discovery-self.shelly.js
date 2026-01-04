@@ -537,21 +537,21 @@ function mqttreport() {
   }
 
   if (!device) {
-    let deviceInfo = Shelly.getDeviceInfo();
-    device = discoveryDevice(deviceInfo);
-    // Free memory as soon as possible
-    deviceInfo = null;
+    device = discoveryDevice(Shelly.getDeviceInfo());
   }
 
-  if (CONFIG.custom_names.channels && !info.addons || CONFIG.custom_names.addon && info.addons) {
-    info.name = Shelly.getComponentConfig(info.topic).name;
+  const compconfig = Shelly.getComponentConfig(info.topic);
+
+  if (CONFIG.custom_names.channels && !info.addons || CONFIG.custom_names.addon && info.addons && compconfig.name.length > 0) {
+    info.name = compconfig.name;
   }
 
   info.mac = device.cns[0][1];
   info.attr_common = getCommonAttr(info.attr);
   if (uidata.consumption_types && uidata.consumption_types[info.ix]) info.altdomain = uidata.consumption_types[info.ix];
-  if ((info.attr_common == "percent" && Shelly.getComponentConfig(info.topic).xpercent.expr !== null)
-      || (info.attr_common == "voltage" && !Shelly.getComponentConfig(info.topic).xvoltage.expr !== null)) {
+
+  const cfg = compconfig["x" + info.attr_common];
+  if ((info.attr_common === "percent" || info.attr_common === "voltage") && cfg && cfg.expr.length > 0) {
     info.forcediagnostic = true;
     info.forcehidden = true;
   }
