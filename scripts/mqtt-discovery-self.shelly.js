@@ -403,15 +403,11 @@ let report_arr = [];
 let report_arr_idx = 0;
 let comp_inst_num = {}; // number of components of the same type, ie switch:0, switch:1 etc
 let device;
-let devicemqtttopic = Shelly.getComponentConfig("mqtt").topic_prefix;
-let uidata = Shelly.getComponentConfig("sys").ui_data;
 
 function initGlobals() {
   report_arr = [];
   report_arr_idx = 0;
   comp_inst_num = {}; // number of components of the same type, ie switch:0, switch:1 etc
-  devicemqtttopic = Shelly.getComponentConfig("mqtt").topic_prefix;
-  uidata = Shelly.getComponentConfig("sys").ui_data;
 }
 
 /**
@@ -494,11 +490,10 @@ function precollect() {
 }
 
 function mqttPublishComponentData(component) {
-    let topic_prefix = Shelly.getComponentConfig("mqtt").topic_prefix;
     let status = Shelly.getComponentStatus(component);
     if (!status) return;
 
-    MQTT.publish(topic_prefix + "/status/" + component, JSON.stringify(status), 1, false);
+    MQTT.publish(Shelly.getComponentConfig("mqtt").topic_prefix + "/status/" + component, JSON.stringify(status), 1, false);
 }
 
 // Publish data of collected components right after discovery is done
@@ -530,8 +525,6 @@ function mqttreport() {
     report_arr_idx = 0;
     comp_inst_num = null;
     device = null;
-    devicemqtttopic = null;
-    uidata = null;
     isProcessing = false;
     return;
   }
@@ -548,7 +541,7 @@ function mqttreport() {
 
   info.mac = device.cns[0][1];
   info.attr_common = getCommonAttr(info.attr);
-  if (uidata.consumption_types && uidata.consumption_types[info.ix]) info.altdomain = uidata.consumption_types[info.ix];
+  if (Shelly.getComponentConfig("sys").ui_data.consumption_types && Shelly.getComponentConfig("sys").ui_data.consumption_types[info.ix]) info.altdomain = Shelly.getComponentConfig("sys").ui_data.consumption_types[info.ix];
 
   const cfg = compconfig["x" + info.attr_common];
   if ((info.attr_common === "percent" || info.attr_common === "voltage") && cfg && cfg.expr.length > 0) {
@@ -558,7 +551,7 @@ function mqttreport() {
 
   info.issingle = comp_inst_num[info.comp] == 1;
 
-  let data = discoveryEntity(devicemqtttopic, info);
+  let data = discoveryEntity(Shelly.getComponentConfig("mqtt").topic_prefix, info);
   data.data.dev = device;
 
   let doms;
@@ -595,7 +588,7 @@ let isProcessing = false;
 function onMQTTConnected() {
   if (isProcessing) return;
   isProcessing = true;
-  precollect(); 
+  precollect();
   discoverytimer = Timer.set(CONFIG.mqtt_publish_pause, true, mqttreport);
 }
 
