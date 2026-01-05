@@ -21,7 +21,7 @@ let CONFIG = {
 };
 
 const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "em1", "emdata", "em1data", "temperature", "cover", "humidity", "voltmeter", "input"];
-const SUPPORTED_ATTRS = ["apower", "aprt_power", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature", "tC", "tF", "state", "rh", "xvoltage", "percent", "xpercent"];
+const SUPPORTED_ATTRS = ["apower", "aprt_power", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature", "tC", "tF", "state", "state-cover", "rh", "xvoltage", "percent", "xpercent"];
 
 const CAT_DIAGNOSTIC = ["rssi","temperature"];
 const DISABLED_ENTS = ["pf", "voltage", "freq", "current", "ret_aenergy", "xvoltage", "state"];
@@ -78,6 +78,7 @@ const DEVCLASSES = {
   "rssi": "signal_strength",
   "light": "light",
   "state": null,
+  "state-cover": null,
   "percent": null,
   "xpercent": null
 }
@@ -98,7 +99,7 @@ const NAMES = {
   "switch": "Switch",
   "rssi": "RSSI",
   "light": "Light",
-  "cover.state": "Cover",
+  "state-cover": "Cover",
   "state": "BinaryIn",
   "percent": "AnalogIn",
   "xpercent": "X-AnalogIn"
@@ -130,7 +131,7 @@ const DOMAINS = {
   "ret_aenergy": "sensor",
   "tC": "sensor",
   "tF": "sensor",
-  "cover.state": "cover",
+  "state-cover": "cover",
   "state": "binary_sensor",
   "output": "switch",
   "pf": "sensor",
@@ -246,16 +247,11 @@ function getUnits(info) {
   */
 function getName(info) {
 
-  // if ( info.name && (info.attr_common == 'switch' || info.attr_common == 'light' )) {
-  //   return info.name;
-  // }
-
   let name;
   let key = info.attr_common;
-  if (info.comp == "cover" && info.attr_common == "state") key = "cover.state";
 
-  if (NAMES[key]) name = NAMES[key];
-  else name = key;
+  if (NAMES[info.attr_common]) name = NAMES[info.attr_common];
+  else name = info.attr_common;
 
   if (info.name) name = info.name + " " + name;
   else if (info.addon) name = "Addon " + name + " " + (info.ix-99);
@@ -269,10 +265,12 @@ function getName(info) {
 /**
  * Retrieves the common attribute value for the specified attribute name.
  *
- * @param {string} attr - The name of the attribute to retrieve.
+ * @param {string} comp - Shelly component name
+ * @param {string} attr - Attribute name to be translated
  * @returns {string} The value of the specified common attribute.
  */
-function getCommonAttr(attr) {
+function getCommonAttr(comp, attr) {
+  if (attr == "state" && comp == "cover") return "state-cover";
   if (ALIASES[attr] === undefined) return attr;
   return ALIASES[attr];
 }
@@ -297,10 +295,8 @@ function getDeviceClass(attr) {
   * @returns {string} - Domain for the attribute, or the attribute name if not recognized
   */
 function getDomain(info) {
-  let key = info.attr_common;
-  if (info.comp == "cover" && info.attr_common == "state") key = "cover.state";
-  if (DOMAINS[key] !== undefined) return DOMAINS[key];
-  return key;
+  if (DOMAINS[info.attr_common] !== undefined) return DOMAINS[info.attr_common];
+  return info.attr_common;
 }
 
 
@@ -432,7 +428,7 @@ function precollect() {
     if (status !== null) {
 
       for (let datattr in status) {
-        if (SUPPORTED_ATTRS.indexOf(getCommonAttr(datattr)) == -1) continue;
+        if (SUPPORTED_ATTRS.indexOf(getCommonAttr(comptype, datattr)) == -1) continue;
         if (datattr == "tC" && CONFIG.temperature_unit != "C") continue;
         if (datattr == "tK" && CONFIG.temperature_unit != "K") continue;
         report_arr.push({comp : comptype, ix: -1, attr: datattr, topic: comptype});
@@ -451,7 +447,7 @@ function precollect() {
         if (status === null) break;
 
         for (let datattr in status) {
-          if (SUPPORTED_ATTRS.indexOf(getCommonAttr(datattr)) == -1) continue;
+          if (SUPPORTED_ATTRS.indexOf(getCommonAttr(comptype, datattr)) == -1) continue;
           if (datattr == "tC" && CONFIG.temperature_unit != "C") continue;
           if (datattr == "tF" && CONFIG.temperature_unit != "F") continue;
           report_arr.push({comp : comptype, ix: index, attr: datattr, topic: scomp});
@@ -478,7 +474,7 @@ function precollect() {
           if (status === null) break;
 
           for (let datattr in status) {
-            if (SUPPORTED_ATTRS.indexOf(getCommonAttr(datattr)) == -1) continue;
+            if (SUPPORTED_ATTRS.indexOf(getCommonAttr(comparr[0], datattr)) == -1) continue;
             if (datattr == "tC" && CONFIG.temperature_unit != "C") continue;
             if (datattr == "tF" && CONFIG.temperature_unit != "F") continue;
             report_arr.push({comp : comparr[0], ix: comparr[1], attr: datattr, topic: scomp, addon: true});
@@ -507,7 +503,7 @@ function mqttForceInitialData() {
 
     mqttPublishComponentData(comps[report_arr_idx]);
     report_arr_idx++;
-    
+
     return false;
 }
 
@@ -543,7 +539,7 @@ function mqttDiscovery() {
   }
 
   info.mac = device.cns[0][1];
-  info.attr_common = getCommonAttr(info.attr);
+  info.attr_common = getCommonAttr(info.comp, info.attr);
   if (Shelly.getComponentConfig("sys").ui_data.consumption_types && Shelly.getComponentConfig("sys").ui_data.consumption_types[info.ix]) info.altdomain = Shelly.getComponentConfig("sys").ui_data.consumption_types[info.ix];
 
   const cfg = compconfig["x" + info.attr_common];
