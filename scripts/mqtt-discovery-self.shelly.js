@@ -24,7 +24,7 @@ const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "em1", "emdata", "em1dat
 const SUPPORTED_ATTRS = ["apower", "aprt_power", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature", "tC", "tF", "state", "rh", "xvoltage", "percent", "xpercent"];
 
 const CAT_DIAGNOSTIC = ["rssi","temperature"];
-const DISABLED_ENTS = ["pf", "voltage", "freq", "current", "ret_aenergy", "xvoltage"];
+const DISABLED_ENTS = ["pf", "voltage", "freq", "current", "ret_aenergy", "xvoltage", "state"];
 
 const ALIASES = {
   "a_current": "current",
@@ -392,8 +392,8 @@ function discoveryEntity(topic, info) {
     pload["ent_cat"] = "diagnostic";
   }
 
-  if (info.forcehidden || (!info.addon && CONFIG.disable_minor_entities && DISABLED_ENTS.indexOf(info.attr_common) != -1)) {
-    pload["en"] = false;
+  if (info.forcedisabled || (!info.addon && CONFIG.disable_minor_entities && DISABLED_ENTS.indexOf(info.attr_common) != -1)) {
+    if (!info.forceenabled) pload["en"] = false;
   }
 
   return { "domain": domain, "subtopic": info.topic.split(":").join("") + "-" + info.attr, "data": pload }
@@ -544,9 +544,14 @@ function mqttreport() {
   if (Shelly.getComponentConfig("sys").ui_data.consumption_types && Shelly.getComponentConfig("sys").ui_data.consumption_types[info.ix]) info.altdomain = Shelly.getComponentConfig("sys").ui_data.consumption_types[info.ix];
 
   const cfg = compconfig["x" + info.attr_common];
-  if ((info.attr_common === "percent" || info.attr_common === "voltage") && cfg && cfg.expr.length > 0) {
+  if ((info.attr_common === "percent" || info.attr_common === "voltage") && cfg && cfg.expr) {
     info.forcediagnostic = true;
-    info.forcehidden = true;
+    info.forcedisabled = true;
+  }
+
+  // do not hide inputs for input only devices
+  if (info.comp == "input" && !comp_inst_num["switch"] && !comp_inst_num["light"] && !comp_inst_num["cover"]) {
+    info.forceenabled = true;
   }
 
   info.issingle = comp_inst_num[info.comp] == 1;
@@ -603,6 +608,7 @@ function onMQTTConnected() {
  * The topic is constructed using the MQTT topic prefix and the "status/wifi" suffix.
  */
 function reportWifiToMQTT() {
+  if (isProcessing) return;
   let components = CONFIG.components_refresh;
 
   for (let t = 0; t < components.length; t++) {
