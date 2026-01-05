@@ -400,14 +400,17 @@ function discoveryEntity(topic, info) {
 }
 
 let report_arr = [];
+let comps = [];
 let report_arr_idx = 0;
 let comp_inst_num = {}; // number of components of the same type, ie switch:0, switch:1 etc
 let device;
 
 function initGlobals() {
   report_arr = [];
+  comps = []
   report_arr_idx = 0;
   comp_inst_num = {}; // number of components of the same type, ie switch:0, switch:1 etc
+
 }
 
 /**
@@ -498,12 +501,14 @@ function mqttPublishComponentData(component) {
 
 // Publish data of collected components right after discovery is done
 function mqttForceInitialData() {
-  if (!CONFIG.publish_init_data) return;
+  if (!CONFIG.publish_init_data) return true;
 
-  for (let i = 0; i < report_arr.length; i++) {
-    if (report_arr[i] === null) continue;
-    mqttPublishComponentData(report_arr[i].topic)
-  }
+    if (!comps[report_arr_idx]) return true;
+
+    mqttPublishComponentData(comps[report_arr_idx]);
+    report_arr_idx++;
+    
+    return false;
 }
 
 
@@ -511,22 +516,20 @@ function mqttForceInitialData() {
  * Processes the next entity in `report_arr` (using `report_arr_idx`), constructs its MQTT discovery payload, and publishes it to the appropriate MQTT discovery topic.
  * @returns
  */
-function mqttreport() {
+function mqttDiscovery() {
   let info;
 
   if (report_arr[report_arr_idx] ) {
     info = report_arr[report_arr_idx];
-    // report_arr[report_arr_idx] = null; // cannot free becuase mqttForcePublishData() needs it later.
+    report_arr[report_arr_idx] = null;
     report_arr_idx++;
   } else {
-    Timer.clear(discoverytimer);
-    mqttForceInitialData();
     report_arr = null;
     report_arr_idx = 0;
     comp_inst_num = null;
     device = null;
     isProcessing = false;
-    return;
+    return true;
   }
 
   if (!device) {
@@ -573,8 +576,12 @@ function mqttreport() {
     }
   }
 
+  if (comps.indexOf(info.topic) == -1 ) comps.push(info.topic);
+
   data = null;
   info = null;
+
+  return false;
 }
 
 /**
@@ -583,6 +590,7 @@ function mqttreport() {
 let discoverytimer;
 let mqttConnected = false;
 let isProcessing = false;
+let processingPhase;
 
 /**
  *  Generate MQTT Discovery
@@ -593,10 +601,26 @@ let isProcessing = false;
 function onMQTTConnected() {
   if (isProcessing) return;
   isProcessing = true;
+  processingPhase = "discovery";
   precollect();
-  discoverytimer = Timer.set(CONFIG.mqtt_publish_pause, true, mqttreport);
+  discoverytimer = Timer.set(CONFIG.mqtt_publish_pause, true, reportingWorker);
 }
 
+function reportingWorker() {
+  switch (processingPhase)  {
+  case "discovery":
+    if (mqttDiscovery()) processingPhase = "data";
+    break;
+  case "data":
+    if (mqttForceInitialData()) processingPhase = "finished";
+    break;
+  case "finished":
+    Timer.clear(discoverytimer);
+    discoverytimer = null;
+    isProcessing = false;
+    break;
+  }
+}
 
 /***************************************
 * RSSI (WiFi) reporting
