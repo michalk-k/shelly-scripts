@@ -29,10 +29,10 @@ While valid for most cases, it still provides an option to change some settings.
 | Variable | Default Value | Description |
 | --- | --- | --- |
 | `custom_names.device` | `true` | Name HA device using device name set in Shelly configuration.<br>Read [Device naming](#device) section for more details. |
-| `report_ip` | `true` | Report ip address of the Shelly device to the Discovery data. It results in a clickable link on the device page in Home Assistant |
-| `fake_macaddress` | `""` | For testing purposes, set alternative macaddress |
-| `discovery_topic` | `"homeassistant"` | MQTT discovery topic |
-| `components_refresh_period` | `60` | [Seconds] Frequency of publishing scripts state data |
+| `report_ip` | `true` | Report ip address of the Shelly device to the Discovery data. It results in a clickable link on the device page in Home Assistant. |
+| `fake_macaddress` | `""` | For testing purposes, set alternative macaddress. |
+| `discovery_topic` | `"homeassistant"` | MQTT discovery topic. |
+| `components_refresh_period` | `60` | [Seconds] Frequency of publishing scripts state data. |
 
 
 ## How does it work
@@ -48,7 +48,7 @@ While entity state reflects number of running script, information about scripts 
 {
   "friendly_name": "PCroom HVAC Socket Scripts",
   "icon": "mdi:script-text-outline",
-  "mem_free": 13412,
+  "mem_free": 12922,
   "scripts": [
     {
       "enable": true,
@@ -71,6 +71,16 @@ While entity state reflects number of running script, information about scripts 
       "mem_used": 2422,
       "name": "mqtt-discovery-scr-mon",
       "running": true
+    },
+    {
+      "enable": false,
+      "id": 4,
+      "name": "error test",
+      "running": false,
+      "errors": [
+        "reference_error"
+      ],
+      "error_msg": "Uncaught ReferenceError: \"adfd\" is not defined\n at adfd\n^\n\n"
     }
   ]
 }
@@ -80,14 +90,16 @@ Attributes comes from Shelly API. Here is their meaning:
 
 | Name | Datatype | Description |
 | :---- | :-------- | :----------- |
-| mem_free | int   | Amount of free memory for scripting (shared for all scripts) |
-| scripts | json | array of objects that reflects state of all scripts |
-| id | int   | Identifier of the script |
-| name | string   | Name of the script |
-| enable | bool   | If true, script is executed at Shelly (re)start |
-| running | bool   | The script is currently running |
-| mem_peak | int   | Maximum memory footprint (in bytes) registered for this script since last run |
-| mem_used | int   | Current memory usage (in bytes) of ths script |
+| mem_free | int   | Amount of free memory for scripting (shared for all scripts). The key is not available if no script is running.|
+| scripts | json | array of objects that reflects state of all scripts. |
+| id | int   | Identifier of the script. |
+| name | string   | Name of the script. |
+| enable | bool   | If true, script is executed at Shelly (re)start. |
+| running | bool   | The script is currently running. |
+| mem_peak | int   | Maximum memory footprint (in bytes) registered for this script since last run. The key is not available if script is not running.|
+| mem_used | int   | Current memory usage (in bytes) of ths script. The key is not available if script is not running. |
+| errors | json array   | Array of errors names (strings). The key is not available when no errors reported.  |
+| error_msg | string   | Last error message. The key is not available if no error has been reported. |
 
 ## Q&As
 
@@ -96,10 +108,10 @@ Data provided in `state/script:N` topics doesn't match reported by this script</
 
 ---
 
-Indeed, Shelly does't report scripts often enough.\
-The most recent values are available for example by calling `http://shelly.address/rpc/Shelly.getStatus`
+Indeed, Shelly does't report script statuses often enough.\
+The most recent values are available for example by calling `http://shelly.address/rpc/Script.GetStatus?id=N`, or `Sys.GetStatus` and `Shelly.GetStatus` that aggregates data from all components.
 
-This script provides up-to-date values at time of reporting.
+This script provides up-to-date values retrieved at time of reporting from Script.GetStatus method.
 
 ---
 </details>

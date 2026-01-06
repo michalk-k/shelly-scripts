@@ -8,5 +8,11 @@
     "fname": "scripts/mqtt-discovery-ble.shelly.js",
     "title": "MQTT Discovery for BLE devices",
     "description": "This script registers BLE devices proxied by the device to Home Assistant using MQTT Discovery. Published data creates link to \"proxy\" device, thus it wise to make the main device being reported to Home Assistant too (use \"MQTT Discovery for self\" for that)."
+  },
+  {
+    "fname": "scripts/mqtt-discovery-scr-mon.shelly.js",
+    "title": "Create Entity Monitoring Shelly Scripts",
+    "description": "This script creates new topic with composite data about script.\n\nThen, utilizing MQTT Discovery, it creates sensor entity that provides this data to Home Assistant."
   }
+  
 ]

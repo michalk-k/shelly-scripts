@@ -56,7 +56,6 @@ function discoveryDevice(deviceInfo) {
   return device;
 }
 
-
 /**
  * Builds data of single entity to be published to MQTT discovery
  * @param {string} topic Object identifier used for preventing repeating discovery topic creation. Will be returned back in the result struct
@@ -71,7 +70,7 @@ function discoveryEntity(topic, mac) {
   pload["stat_t"] = topic + "/status/scripts";
   pload["json_attributes_topic"] = topic + "/status/scripts";
   pload["val_tpl"] = "{{ value_json.running_count }}";
-  pload["json_attributes_template"] = "{{ {'scripts': value_json.scripts, 'mem_free': value_json.mem_free } | tojson }}";
+  pload["json_attributes_template"] = "{{ {'scripts': value_json.scripts, 'scripts_mem_free': value_json.scripts_mem_free } | tojson }}";
   pload["ent_cat"] = "diagnostic";
   pload["icon"] = "mdi:script-text-outline";
 
@@ -89,29 +88,27 @@ function mqttDiscovery() {
     MQTT.publish(discoveryTopic, JSON.stringify(data.data), 1, true);
 }
 
-mqttDiscovery();
-
 function reportScriptsToMQTT() {
   Shelly.call("Script.List", {}, function (res) {
 
     res.running_count = 0
-    res.mem_free = null
+    res.scripts_mem_free = null
 
     for (let stats of res.scripts) {
        stats.running = Shelly.getComponentStatus("script", stats.id).running;
        stats.mem_used = Shelly.getComponentStatus("script", stats.id).mem_used;
        stats.mem_peak = Shelly.getComponentStatus("script", stats.id).mem_peak;
        stats.errors = Shelly.getComponentStatus("script", stats.id).errors;
+       stats.error_msg = Shelly.getComponentStatus("script", stats.id).error_msg;
 
        if (stats.running) res.running_count++;
-       res.mem_free = Shelly.getComponentStatus("script", stats.id).mem_free;
+       res.scripts_mem_free = Shelly.getComponentStatus("script", stats.id).mem_free;
     }
 
     MQTT.publish(Shelly.getComponentConfig("mqtt").topic_prefix + "/status/scripts", JSON.stringify(res), 1, false);
   });
 }
 
-// Initial call to report WiFi status
-// This will also set up a timer to report WiFi status every 60 seconds
+mqttDiscovery();
 reportScriptsToMQTT();
 let timer_handle = Timer.set(CONFIG.mqtt_refresh_period * 1000, true, reportScriptsToMQTT, null);
