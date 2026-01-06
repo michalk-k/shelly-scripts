@@ -304,3 +304,17 @@ mode: single
 ```
 ---
 </details>
+
+<details><summary>
+Superfluous entities remains in HA</summary>
+
+---
+
+The script is aware only of the Shelly components that exist at the time the discovery is run. If significant changes are made to the Shelly configuration (for example, switching from Switch to Cover mode), a subsequent run of the script has no knowledge of previously created entities and therefore cannot remove them.
+
+I made some attempts to address this issue (for example, handling a change between Switch and Light), but certain scenarios would require hard-coding a large number of dependencies.
+
+**The easiest way to resolve this is to delete the device (from HA GUI) and then run the script again.**
+
+---
+</details>
