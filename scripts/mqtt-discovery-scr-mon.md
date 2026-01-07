@@ -19,7 +19,7 @@ If you run other scripts from this package, the entity will be added to Diagnost
 
 ## Installation and Configuration
 
-For installation, read the [Installation](../README.md#installation) section.
+For installation, read the [Installation](/#installation) section.
 
 **Configuration parameters**
 
@@ -28,7 +28,7 @@ While valid for most cases, it still provides an option to change some settings.
 
 | Variable | Default Value | Description |
 | --- | --- | --- |
-| `custom_names.device` | `true` | Name HA device using device name set in Shelly configuration.<br>Read [Device naming](#device) section for more details. |
+| `custom_names.device` | `true` | Name HA device using device name set in Shelly configuration.<br>Read [Device naming](./mqtt-discovery-self.md#device) section for more details. |
 | `report_ip` | `true` | Report ip address of the Shelly device to the Discovery data. It results in a clickable link on the device page in Home Assistant. |
 | `fake_macaddress` | `""` | For testing purposes, set alternative macaddress. |
 | `discovery_topic` | `"homeassistant"` | MQTT discovery topic. |
@@ -48,7 +48,7 @@ While entity state reflects number of running script, information about scripts 
 {
   "friendly_name": "PCroom HVAC Socket Scripts",
   "icon": "mdi:script-text-outline",
-  "mem_free": 12922,
+  "scripts_mem_free": 12922,
   "scripts": [
     {
       "enable": true,
@@ -90,7 +90,7 @@ Attributes comes from Shelly API. Here is their meaning:
 
 | Name | Datatype | Description |
 | :---- | :-------- | :----------- |
-| mem_free | int   | Amount of free memory for scripting (shared for all scripts). The key is not available if no script is running.|
+| scripts_mem_free | int   | Amount of free memory for scripting (shared for all scripts). The key is not available if no script is running.|
 | scripts | json | array of objects that reflects state of all scripts. |
 | id | int   | Identifier of the script. |
 | name | string   | Name of the script. |
