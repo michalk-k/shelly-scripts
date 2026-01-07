@@ -14,6 +14,9 @@ The script registers BLE devices being proxied by the shelly device (proxy) into
 **MQTT Discovery: Scripts Monitor** [docs](scripts/mqtt-discovery-scr-mon.md)\
 The script monitors state of Shelly scripts, providing this information to Home assistant sensor, utilizing MQTT Discovery protocol
 
+**MQTT Periodic Component Publisher** [docs](scripts/mqtt-periodic-pub.md)\
+This script republishes, at a configurable interval, the states of selected components to MQTT.
+
 ## Installation
 
 There are several methods how to install scripts.

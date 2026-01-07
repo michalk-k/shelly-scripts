@@ -1,5 +1,8 @@
 # Changelog
 
+## v4.0.0
+* Added `mqtt-periodic-pub` script, for periodic publishing of any Shelly component
+
 ## v3.0.0
 * Added inputs as `BinaryIn` (note, shelly doesn't report device inputs in button mode; unlike addon binary inputs)
 * Added option to publish entities data just after discovery (to avoid unavailable/unknown states)
