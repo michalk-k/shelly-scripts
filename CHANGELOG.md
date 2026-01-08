@@ -1,4 +1,7 @@
 # Changelog
+## v4.1.1
+* added documentation for `mqtt-discovery-ble` script
+
 ## v4.1.0
 * `mqtt-discovery-self`
   - Removed `temperature:0` from default settings. Use `mqtt-periodic-pub` script for reporting other components than `wifi`.

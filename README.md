@@ -8,7 +8,7 @@ The repository offers following scripts:
 **MQTT Discovery: Self** [docs](scripts/mqtt-discovery-self.md)\
 The script registers the Shelly device (including addons) into MQTT using Discovery protocol (commonly used by Home Assistant).
 
-**MQTT Discovery: BLE** \
+**MQTT Discovery: BLE** [docs](scripts/mqtt-discovery-ble.md)\
 The script registers BLE devices being proxied by the shelly device (proxy) into MQTT, using Discovery protocol (commonly used by Home Assistant).
 
 **MQTT Discovery: Scripts Monitor** [docs](scripts/mqtt-discovery-scr-mon.md)\
