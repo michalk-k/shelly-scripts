@@ -23,6 +23,8 @@ It is useful for components that are never published by the Shelly device (e.g. 
 
 For installation instructions, see the [Installation](/#installation) section.
 
+Link to the script: [link](./mqtt-periodic-pub.shelly.js)
+
 **Configuration parameters**
 
 The script is designed to run without any additional configuration.\

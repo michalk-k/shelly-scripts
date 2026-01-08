@@ -26,6 +26,8 @@ It creates entities for all supported properties: switches, sensors, etc.
 
 For installation, read the [Installation](/#installation) section.
 
+Link to the script: [link](./mqtt-discovery-self.shelly.js)
+
 **Configuration parameters**
 
 The script is configured to be run without the need for additional configuration.\
@@ -43,7 +45,7 @@ While valid for most cases, it still provides an option to change some settings.
 | `publish_init_data` | `true` | Ask Shelly to publish data to MQTT when the Discovery is completed.  With `false`, all entities remain in an unavailable state as long as values do not change. It helps to receive the current states immediately after the Discovery |
 | `discovery_topic` | `"homeassistant"` | MQTT discovery topic |
 | `mqtt_publish_pause` | `500` | [Milliseconds] Due to Shelly limitations, publishing of large number of topics to MQTT has to be slowed down. This is the pause added to every entry publication. |
-| `components_refresh` | `["wifi", "temperature:0"]` | List of components, their data will be periodically refreshed in MQTT. Wifi (this RSSI) is not reported by Shelly at all. Switch temperatures are reported only on switch state change. This setting helps to get this data.<br><br>For exact names of components look at `<mqtt_topic>/status` topic. These topics are not retained, so you have to wait for the first change reported to see these topics.<br>The `<mqtt_topic>` topic is configured in the MQTT settings of the Shelly device.  |
+| `components_refresh` | `["wifi"]` | List of Shelly component instances. Wifi is here by default because of intention of reporting RSSI to the Discovery. Other component instances can be also added (ie `temperature:0`) but it's advised to use dedicated [mqtt-periodic-pub](./mqtt-periodic-pub.md) script for that. It's more flexible. |
 | `components_refresh_period` | `60` | [Seconds] Frequency of publishing selected components data |
 
 

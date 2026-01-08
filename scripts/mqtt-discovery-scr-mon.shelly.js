@@ -78,6 +78,12 @@ function discoveryEntity(topic, mac) {
 }
 
 function mqttDiscovery() {
+
+    if (!MQTT.isConnected()) {
+        print ("MQTT not connected, skipping discovery publish");
+        return;
+    }
+
     let device = discoveryDevice(Shelly.getDeviceInfo());
     let mac = device.cns[0][1]
     let data = discoveryEntity(Shelly.getComponentConfig("mqtt").topic_prefix, mac);
@@ -89,6 +95,12 @@ function mqttDiscovery() {
 }
 
 function reportScriptsToMQTT() {
+
+  if (!MQTT.isConnected()) {
+    print ("MQTT not connected, skipping publish");
+    return;
+  }
+
   Shelly.call("Script.List", {}, function (res) {
 
     res.running_count = 0

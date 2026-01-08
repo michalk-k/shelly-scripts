@@ -16,7 +16,7 @@ let CONFIG = {
   discovery_topic: "homeassistant",
   mqtt_publish_pause: 500,          // (milliseconds) discovery entities will are published to MQTT entry-by-entry with pause inbeetween
 
-  components_refresh: ["wifi", "temperature:0"],
+  components_refresh: ["wifi"],
   components_refresh_period: 60     // (seconds) how often report components above to mqtt
 };
 
@@ -636,12 +636,9 @@ function reportWifiToMQTT() {
   }
 }
 
-// Initial call to report WiFi status
+
 // This will also set up a timer to report WiFi status every 60 seconds
-reportWifiToMQTT();
 let timer_handle = Timer.set(CONFIG.components_refresh_period * 1000, true, reportWifiToMQTT, null);
-
-
 
 
 // Report Discovery on MQTT connection
@@ -665,12 +662,6 @@ Shelly.addEventHandler(
 );
 
 // Report Discovery on the script start
-Shelly.call("MQTT.GetStatus", {}, function (res) {
-  mqttConnected = res.connected;
-
-  if (mqttConnected) {
-    // Treat script start while already connected
-    onMQTTConnected();
-  }
-});
+mqttConnected = MQTT.isConnected();
+if (mqttConnected) onMQTTConnected();
 

@@ -21,6 +21,8 @@ If you run other scripts from this package, the entity will be added to Diagnost
 
 For installation, read the [Installation](/#installation) section.
 
+Link to the script: [link](./mqtt-discovery-scr-mon.shelly.js)
+
 **Configuration parameters**
 
 The script is configured to be run without the need for additional configuration.\

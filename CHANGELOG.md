@@ -1,4 +1,8 @@
 # Changelog
+## v4.1.0
+* Removed temperature:0 from default settings of `mqtt-discovery-self`. Use mqtt-periodic-pub for reporting other components than `wifi`.
+* docs: added direct links to skripts
+* added publishing to MQTT only if MQTT is connected.
 
 ## v4.0.0
 * Added `mqtt-periodic-pub` script, for periodic publishing of any Shelly component
