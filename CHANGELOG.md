@@ -1,8 +1,14 @@
 # Changelog
 ## v4.1.0
-* Removed temperature:0 from default settings of `mqtt-discovery-self`. Use mqtt-periodic-pub for reporting other components than `wifi`.
-* docs: added direct links to skripts
-* added publishing to MQTT only if MQTT is connected.
+* `mqtt-discovery-self`
+  - Removed `temperature:0` from default settings. Use `mqtt-periodic-pub` script for reporting other components than `wifi`.
+* `mqtt-discovery-src.mon`:
+  - added publishing to MQTT only if MQTT is connected.
+  - added `data_topic` setting
+* moved manifest file into scripts/ subdirectory to avoid prefixing script names with `scripts/` after import to a Shelly;
+* docs:
+  - added direct links to scripts
+  - adjustement, polishing
 
 ## v4.0.0
 * Added `mqtt-periodic-pub` script, for periodic publishing of any Shelly component

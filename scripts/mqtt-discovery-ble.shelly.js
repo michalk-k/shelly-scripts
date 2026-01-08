@@ -11,14 +11,14 @@
  * 5. Restart script
  * 6. Read debug for discovered device name.
  * 7. Look for the device in HA
- * 
+ *
  * More information:
- * 
+ *
  * Because BLE passive scanner process data of all surroudning BLE devices, this script allows to filter them by MAC address.
- * 
+ *
  * IF `CONFIG.filter_devices` IS `true` (default), THEN
  * ONLY BLE DEVICES IDENTIFIED BY MAC ADDRESSES FOUND IN `allowed_devicess` STRUCTURE WILL BE PROCESSED
- * 
+ *
  * MAC addresses can be set in `CONFIG.allowed_devicess` variable or into KVS under `allowed_devicess` key.
  * The KVS allows to add devices without need of changing the code of the script.
 
@@ -478,15 +478,15 @@ function discoveryEntity(objident, topic, objtype, bt_index) {
         pload["name"]       = "button " + (bt_index + 1);
         subt                = "button-" + (bt_index + 1);
       }
-      
+
       if (bt_index == -1) bt_index = 0;
-      
+
       pload["stat_t"]       = topic;
       pload["val_tpl"]      = '{% set buttons = value_json.get("button") %} \
 { {%- if buttons and buttons[' + bt_index + '] != "none" -%} \
 "button": "button", "event_type": "{{ buttons[' + bt_index + '] }}" \
 {%- endif -%} }';
-        
+
       break;
     default:
       printDebug("Unrecognized obj type: ", objtype, ". Ignored");

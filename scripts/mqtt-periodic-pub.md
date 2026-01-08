@@ -4,9 +4,9 @@ This script republishes, at a configurable interval, the states of selected comp
 
 It is useful for components that are never published by the Shelly device (e.g. `wifi`, `eth`) or for values that are updated only infrequently, such as temperatures.
 
-> **Note:** The switch component also includes temperature measurements. To refresh this temperature more frequently, the switch component itself must be published.
+> :bulb: **Note:** The switch component also includes temperature measurements. To refresh this temperature more frequently, the switch component itself must be published.
 
-> **Avoid** publishing the same components by different scripts. For example `mqtt-discovery-self`script by default publishes `wifi`.
+> :warning: **Avoid** publishing the same components by different scripts. For example `mqtt-discovery-self`script by default publishes `wifi`.
 
 **Features**
 

@@ -7,9 +7,10 @@ let CONFIG = {
   report_ip: true,                  // create URL link to open Shelly GUI from HA
   fake_macaddress: "",              // for testing purposes, set alternative macaddress
 
+  data_topic: "scripts",
   discovery_topic: "homeassistant",
 
-  mqtt_refresh_period: 60 
+  mqtt_refresh_period: 60
 };
 
 /**
@@ -67,14 +68,14 @@ function discoveryEntity(topic, mac) {
 
   pload["name"] = "Scripts";
   pload["uniq_id"] = mac + "_scripts";
-  pload["stat_t"] = topic + "/status/scripts";
-  pload["json_attributes_topic"] = topic + "/status/scripts";
+  pload["stat_t"] = topic + "/status/" + CONFIG.data_topic;
+  pload["json_attributes_topic"] = topic + "/status/" + CONFIG.data_topic;
   pload["val_tpl"] = "{{ value_json.running_count }}";
   pload["json_attributes_template"] = "{{ {'scripts': value_json.scripts, 'scripts_mem_free': value_json.scripts_mem_free } | tojson }}";
   pload["ent_cat"] = "diagnostic";
   pload["icon"] = "mdi:script-text-outline";
 
-  return { "domain": "sensor", "subtopic": "scripts", "data": pload }
+  return { "domain": "sensor", "subtopic": "scripts_monitor", "data": pload }
 }
 
 function mqttDiscovery() {
@@ -117,10 +118,10 @@ function reportScriptsToMQTT() {
        res.scripts_mem_free = Shelly.getComponentStatus("script", stats.id).mem_free;
     }
 
-    MQTT.publish(Shelly.getComponentConfig("mqtt").topic_prefix + "/status/scripts", JSON.stringify(res), 1, false);
+    MQTT.publish(Shelly.getComponentConfig("mqtt").topic_prefix + "/status/" + CONFIG.data_topic, JSON.stringify(res), 1, false);
   });
 }
 
 mqttDiscovery();
-reportScriptsToMQTT();
+Timer.set(2000, false, reportScriptsToMQTT, null);
 let timer_handle = Timer.set(CONFIG.mqtt_refresh_period * 1000, true, reportScriptsToMQTT, null);

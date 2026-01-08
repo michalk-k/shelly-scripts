@@ -48,6 +48,7 @@ While valid for most cases, it still provides an option to change some settings.
 | `components_refresh` | `["wifi"]` | List of Shelly component instances. Wifi is here by default because of intention of reporting RSSI to the Discovery. Other component instances can be also added (ie `temperature:0`) but it's advised to use dedicated [mqtt-periodic-pub](./mqtt-periodic-pub.md) script for that. It's more flexible. |
 | `components_refresh_period` | `60` | [Seconds] Frequency of publishing selected components data |
 
+> :warning: If other scripts from the suite are used, make sure that `custom_names` and `report_ip` are configured the same way in all scripts
 
 ## Compatibility
 
@@ -174,11 +175,11 @@ If Shelly device custom name is not configured, the device name follows the patt
 
 example: `b8d6xxxxxxxx-Plus2PM`.
 
-> The model name is what Shelly firmware reports. It doesn't match the product name exactly.
+> :bulb: The model name is what Shelly firmware reports. It doesn't match the product name exactly.
 
 If the device custom name is configured in  `Settings / Device Name`, this name will override the pattern above. This feature can be disabled by setting `custom_names.device` script option to `false`.
 
-> Note: the Home Assistant uses the device name as a prefix for entity names. However, changing the device name when entities are already registered DOES NOT affect entity names.
+> :bulb: Note: the Home Assistant uses the device name as a prefix for entity names. However, changing the device name when entities are already registered DOES NOT affect entity names.
 
 #### Entities
 
@@ -220,7 +221,7 @@ Depending custom names usage, it might look like:\
 `AlcoveLight Active Power 2`\
 `AlcoveLight Backlight`
 
-> Note: You can change the friendly name in entity settings in Home Assistant. It takes precedence.
+> :bulb: Note: You can change the friendly name in entity settings in Home Assistant. It takes precedence.
 
 ##### Unique_ID
 
@@ -246,7 +247,7 @@ etc.
 
 The `entity_id` may be influenced by the Device name set in Shelly configuration or changed later on in Home Assistant.
 
-> Once registred, the entity id remains unchanged until modified in HA settings. It can be reset to its generic form described above by using reset button in entity settings.
+> :bulb: Once registred, the entity id remains unchanged until modified in HA settings. It can be reset to its generic form described above by using reset button in entity settings.
 
 ### Alternative Device Class
 It's often useful to have a switch interpreted by Home Assistant as a light.
@@ -255,7 +256,7 @@ It can be achieved in Home Assistant with the use of the "Change device type of 
 
 Shelly devices allow entering this information in settings at `Output Settings -> Consumption Type`. Entering `light` makes the switch be reported as a light to Home Assistant.
 
-> Currently, only `light` as an alternative device class is supported
+> :bulb: Currently, only `light` as an alternative device class is supported
 
 Note that the change neither influences `unique_id`, the name part of `entity_id`, nor the MQTT topic names. But it will affect the `entity name`, `friendly name`, as well as domain of the entity.
 
@@ -317,6 +318,18 @@ The script is aware only of the Shelly components that exist at the time the dis
 I made some attempts to address this issue (for example, handling a change between Switch and Light), but certain scenarios would require hard-coding a large number of dependencies.
 
 **The easiest way to resolve this is to delete the device (from HA GUI) and then run the script again.**
+
+---
+</details>
+
+<details><summary>
+Script does not report connected BLE devices</summary>
+
+---
+
+That is correct. This script was originally designed with Gen2+ devices in mind, while reporting connected BLE devices is a Gen3+ feature. I will look into whether this can be added.
+
+In the meantime, the [mqtt-discovery-ble](./mqtt-discovery-ble.shelly.js) script may be useful. It provides MQTT discovery for all BLE devices (filtered by MAC address), not only those linked to the Shelly device.
 
 ---
 </details>

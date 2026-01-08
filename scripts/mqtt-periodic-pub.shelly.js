@@ -1,11 +1,11 @@
 /**
 * The script publishes periodically selected component statuses to MQTT.
 * For valid names of components look into `http://shelly_address/rpc/Shelly.GetStatus` page
-* or into status MQTT topic of particular device. 
+* or into status MQTT topic of particular device.
 * Note, not all components are reported by default by Shelly device. For example `wifi` is not.
 *
 * Component name or exact component instance identifier can used in configuration, for example:
-* "switch" for refreshing all switches, or 
+* "switch" for refreshing all switches, or
 * "switch:0" for refreshing selected one
 *
 * Note switch component consist of temperature measurement. To make this temperature be refreshed more often, switch component must be published
@@ -24,7 +24,7 @@ let inst_id;
 let internal_timer;
 
 function publishToMQTT_worker() {
-  
+
   const comp = CONFIG.components[comp_name];
 
   if (!comp) {
@@ -32,7 +32,7 @@ function publishToMQTT_worker() {
     internal_timer = null;
     return;
   }
-  
+
   let status = Shelly.getComponentStatus(comp);
 
   if (status) comp_name++;

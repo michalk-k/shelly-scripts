@@ -50,7 +50,7 @@ There are several methods how to install scripts.
    1. Run it, optionally mark as `Run at Startup`
 
 ```
-https://raw.githubusercontent.com/michalk-k/shelly-scripts/main/manifest.json
+https://raw.githubusercontent.com/michalk-k/shelly-scripts/main/scripts/manifest.json
 ```
 ---
 </details>

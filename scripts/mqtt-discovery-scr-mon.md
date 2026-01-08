@@ -33,9 +33,11 @@ While valid for most cases, it still provides an option to change some settings.
 | `custom_names.device` | `true` | Name HA device using device name set in Shelly configuration.<br>Read [Device naming](./mqtt-discovery-self.md#device) section for more details. |
 | `report_ip` | `true` | Report ip address of the Shelly device to the Discovery data. It results in a clickable link on the device page in Home Assistant. |
 | `fake_macaddress` | `""` | For testing purposes, set alternative macaddress. |
+| `data_topic` | `"scripts"` | MQTT topic name (appended `status` topic where Shelly reports its data). The scripts data will be reported to this topic. |
 | `discovery_topic` | `"homeassistant"` | MQTT discovery topic. |
 | `components_refresh_period` | `60` | [Seconds] Frequency of publishing scripts state data. |
 
+> :warning: If other scripts from the suite are used, make sure that `custom_names` and `report_ip` are configured the same way in all scripts
 
 ## How does it work
 
