@@ -1,4 +1,9 @@
 # Changelog
+## W.I.P
+* `mqtt-discovery-self`
+  - refactored for memory footprint optimization. Saved about 2.5kB
+  - reDiscovery on Shelly configuration change limited to components being reported plus `sys` component for device name change
+
 ## v4.1.1
 * added documentation for `mqtt-discovery-ble` script
 

@@ -19,13 +19,13 @@ let CONFIG = {
   refresh_period: 60,           // (seconds) how often report components above to mqtt
   publish_delay:  500           // (miliseconds) how often report components above to mqtt
 };
-let comp_name =0;
-let inst_id;
+let comp_ix = 0; // index of component from CONFIG.components being processed
+let inst_id; // ie switch:1 -> inst_id = 1 
 let internal_timer;
 
 function publishToMQTT_worker() {
 
-  const comp = CONFIG.components[comp_name];
+  const comp = CONFIG.components[comp_ix];
 
   if (!comp) {
     Timer.clear(internal_timer);
@@ -35,15 +35,15 @@ function publishToMQTT_worker() {
 
   let status = Shelly.getComponentStatus(comp);
 
-  if (status) comp_name++;
+  if (status) comp_ix++;
   else if (comp.indexOf(":") == -1) {
-
+    // script component instance ids start from 1, other components from 0
     if (inst_id === null) inst_id = (comp == 'script') ? 1 : 0;
 
     status = Shelly.getComponentStatus(comp, inst_id);
     if (status) inst_id++;
     else {
-      comp_name++;
+      comp_ix++;
       inst_id = null;
     }
   }
@@ -60,7 +60,7 @@ function publishToMQTT() {
     return;
   }
 
-  comp_name = 0;
+  comp_ix = 0;
   inst_id = null;
   publishToMQTT_worker();
   internal_timer = Timer.set(CONFIG.publish_delay, true, publishToMQTT_worker, null);
