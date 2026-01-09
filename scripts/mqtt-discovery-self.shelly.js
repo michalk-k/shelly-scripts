@@ -422,12 +422,9 @@ function precollect() {
   for (let t = 0; t < COMPONENT_TYPES.length; t++) {
     let comptype = COMPONENT_TYPES[t];
 
-    // create data for single components
-    status = Shelly.getComponentStatus(comptype);
+    if (Shelly.getComponentStatus(scomp) !== null) {
 
-    if (status !== null) {
-
-      for (let datattr in status) {
+      for (let datattr in Shelly.getComponentStatus(scomp)) {
         if (SUPPORTED_ATTRS.indexOf(getCommonAttr(comptype, datattr)) == -1) continue;
         if (datattr == "tC" && CONFIG.temperature_unit != "C") continue;
         if (datattr == "tK" && CONFIG.temperature_unit != "K") continue;
@@ -442,11 +439,10 @@ function precollect() {
       while (true) {
 
         let scomp = comptype + ":" + index;
-        status = Shelly.getComponentStatus(scomp);
+    
+        if (Shelly.getComponentStatus(scomp) === null) break;
 
-        if (status === null) break;
-
-        for (let datattr in status) {
+        for (let datattr in Shelly.getComponentStatus(scomp)) {
           if (SUPPORTED_ATTRS.indexOf(getCommonAttr(comptype, datattr)) == -1) continue;
           if (datattr == "tC" && CONFIG.temperature_unit != "C") continue;
           if (datattr == "tF" && CONFIG.temperature_unit != "F") continue;
@@ -534,15 +530,15 @@ function mqttDiscovery() {
 
   const compconfig = Shelly.getComponentConfig(info.topic);
 
-  if (CONFIG.custom_names.channels && !info.addons || CONFIG.custom_names.addon && info.addons && compconfig.name.length > 0) {
-    info.name = compconfig.name;
+  if (CONFIG.custom_names.channels && !info.addons || CONFIG.custom_names.addon && info.addons && Shelly.getComponentConfig(info.topic).name.length > 0) {
+    info.name = Shelly.getComponentConfig(info.topic).name;
   }
 
   info.mac = device.cns[0][1];
   info.attr_common = getCommonAttr(info.comp, info.attr);
   if (Shelly.getComponentConfig("sys").ui_data.consumption_types && Shelly.getComponentConfig("sys").ui_data.consumption_types[info.ix]) info.altdomain = Shelly.getComponentConfig("sys").ui_data.consumption_types[info.ix];
 
-  const cfg = compconfig["x" + info.attr_common];
+  const cfg = Shelly.getComponentConfig(info.topic)["x" + info.attr_common];
   if ((info.attr_common === "percent" || info.attr_common === "voltage") && cfg && cfg.expr) {
     info.forcediagnostic = true;
     info.forcedisabled = true;
