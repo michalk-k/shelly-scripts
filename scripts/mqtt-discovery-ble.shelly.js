@@ -1,55 +1,3 @@
-/**
- * BLE passive scanner and MQTT gateway
- * Detected devices will be automatically registered to HA/Domoticz using MQTT Autodiscovery.
- *
- * Quick instructions:
- * 1. Run the scripts with default settings (debug enabled, filtering enabled)
- * 2. Open script to see debug console
- * 2. Press button of device you want to add or wait for it airs anything
- * 3. Copy mac address from the debug console
- * 4. Add mac to `allowed_devices` variable or `allowed_devices` KVS key. Read below for the data format
- * 5. Restart script
- * 6. Read debug for discovered device name.
- * 7. Look for the device in HA
- *
- * More information:
- *
- * Because BLE passive scanner process data of all surroudning BLE devices, this script allows to filter them by MAC address.
- *
- * IF `CONFIG.filter_devices` IS `true` (default), THEN
- * ONLY BLE DEVICES IDENTIFIED BY MAC ADDRESSES FOUND IN `allowed_devicess` STRUCTURE WILL BE PROCESSED
- *
- * MAC addresses can be set in `CONFIG.allowed_devicess` variable or into KVS under `allowed_devicess` key.
- * The KVS allows to add devices without need of changing the code of the script.
-
- * The format of those data is: { "<mac address>": [ "<manufacturer>", "<model>" ], } for example:
- *
- * {
- *   "xxxxxxxxxxxx": [ "Shelly", "DW BLU" ],
- *   "yyyyyyyyyyyy": [ "Shelly", "Motion BLU" ],
- *   "zzzzzzzzzzzz": [ "Shelly", "H&T BLU" ]
- * }
- *
- * The manufacturer and model cannot be obtained from passive scan of BLE telegrams.
- * Set into structure, contribute to MQTT dicovery.
- * If you don't need that (not adviced), pass empty array instead: { "3c2exxxxxxxx": [], }
- *
- * Debugging:
- *
- * You can disable mac filtering at all by setting `CONFIG.filter_devices` to false.
- *
- * If `CONFIG.debug` is true, script will output mac addresses of ignored and processed devices to the console.
- * Also it will output device and entity names, though once at time of registering them to MQTT Discovery.
- *
- * Supported payloads: ATC/Xiaomi/BTHomev2 through advertisements packets
- *
- * Sensor values sent to 'mqtt_topic' and device config objects sent to 'discovery_topic'.
- * Copyleft Alexander Nagy @ bitekmindenhol.blog.hu, Michal Bartak
- */
-
-
-const DEVICE_INFO = Shelly.getDeviceInfo();
-
 let CONFIG = {
   /**
    * If true, only selected devices will be processed.
@@ -348,7 +296,7 @@ function discoveryDevice(address) {
   device["name"] = address + (model === "" ? "" : "-" + model);
   device["ids"] = [address + ""];
   device["cns"] = [["mac", address]];
-  device["via_device"] = normalizeMacAddress(DEVICE_INFO.mac);
+  device["via_device"] = normalizeMacAddress(Shelly.getDeviceInfo().mac);
 
   if (CONFIG.allowed_devices[address][0] !== undefined) {
     device["mf"] = CONFIG.allowed_devices[address][0];
@@ -537,8 +485,7 @@ function discoveryItems(address, topic, jsonstr) {
   // Iterate through all values, even unsupported.
   // Not supported params will be ignored within autodiscovery()
   // then stored into `discovered` array and never processed again.
-  for (let i = 0; i < params.length; i++) {
-    let objtype = params[i];
+  for (let objtype in params) {
     if (objtype == 'button' && jsonstr['button'].length > 1) { // pass only multiple buttons
       for (let b = 0; b < jsonstr['button'].length; b++) {
         let objident = address + "-" + objtype + "-" + (b + 1);
@@ -546,8 +493,7 @@ function discoveryItems(address, topic, jsonstr) {
           ploads.push(discoveryEntity(objident, topic, objtype, b));
         }
       }
-    }
-    else {
+    } else {
       let objident = address + "-" + objtype;
       if (discovered.indexOf(objident) == -1) {
         ploads.push(discoveryEntity(objident, topic, objtype, -1)); // we need that -1 in case of single button device (simplifies its name)
@@ -555,17 +501,17 @@ function discoveryItems(address, topic, jsonstr) {
     }
   }
 
-  for (let i = 0; i < ploads.length; i++) {
+  for (let item in ploads) {
 
-    if (ploads[i] === undefined) continue;
+    if (item === undefined) continue;
 
-    ploads[i].data.device = discoveryDevice(address);
-    let discoveryTopic = CONFIG.discovery_topic + ploads[i].domain + "/" + address + "/" + ploads[i].subtopic + "/config";
+    item.data.device = discoveryDevice(address);
+    let discoveryTopic = CONFIG.discovery_topic + item.domain + "/" + address + "/" + item.subtopic + "/config";
 
-    MQTT.publish(discoveryTopic, JSON.stringify(ploads[i].data), 1, true);
-    printDebug("Discovered: ", ploads[i].data.name, "; path", discoveryTopic);
+    MQTT.publish(discoveryTopic, JSON.stringify(item.data), 1, true);
+    printDebug("Discovered: ", item.data.name, "; path", discoveryTopic);
 
-    discovered.push(ploads[i].objident); //mark as discovered
+    discovered.push(item.objident); //mark as discovered
   }
 }
 
@@ -578,16 +524,15 @@ function mqttreport(address, rssi, jsonstr) {
     return;
   }
 
-  printDebug("Processed MAC: ", macNormalized);
-  printDebug("Data: ", JSON.stringify(jsonstr));
+  // printDebug("Processed MAC: ", macNormalized);
+  // printDebug("Data: ", JSON.stringify(jsonstr));
 
   let topic = CONFIG.mqtt_topic + macNormalized + "/" + getTopicName(jsonstr);
-  printDebug("Topic:", topic);
+  // printDebug("Topic:", topic);
 
   jsonstr['rssi'] = rssi;
-  if (CONFIG.mqtt_src) {
-    jsonstr['src'] = CONFIG.mqtt_src;
-  }
+  jsonstr['src'] = Shelly.getDeviceInfo().id + " (" + Shelly.getDeviceInfo().name + ")";
+
 
   // Create discovery entries if needed
   discoveryItems(macNormalized, topic, jsonstr);
@@ -699,26 +644,18 @@ function scanCB(ev, res) {
 }
 
 function init() {
-  // get the config of ble component
-  const BLEConfig = Shelly.getComponentConfig("ble");
-
   // exit if the BLE isn't enabled
-  if (!BLEConfig.enable) {
-    console.log(
-      "Error: The Bluetooth is not enabled, please enable it from settings"
-    );
+  if (!Shelly.getComponentConfig("ble").enable) {
+    console.log("Error: The Bluetooth is not enabled, please enable it from settings");
     return;
   }
 
   // check if the scanner is already running
   if (BLE.Scanner.isRunning()) {
     console.log("Info: The BLE gateway is running, the BLE scan configuration is managed by the device");
-  }
-  else {
+  } else {
     // start the scanner
-    const bleScanner = BLE.Scanner.Start(SCAN_PARAM_WANT);
-
-    if (!bleScanner) {
+    if (!BLE.Scanner.Start(SCAN_PARAM_WANT)) {
       console.log("Error: Can not start new scanner");
     }
   }
@@ -736,8 +673,8 @@ function printDebug() {
   if (!CONFIG.debug) return;
 
   let str = "";
-  for (let i = 0; i < arguments.length; i++) {
-    str = str + arguments[i];
+  for (let e in arguments) {
+    str = str + e;
   }
 
   console.log(str);
@@ -752,14 +689,12 @@ function printDebug() {
  * @async
  */
 function kvsGet(key, callback) {
-  Shelly.call(
-    "KVS.Get",
-    { key: key },
+  Shelly.call("KVS.Get", { key: key },
     function (result, error) {
       if (error == -105) {
-        printDebug("No `" + key + "` key found in KVS. It's OK if you don't need that");
+        console.log("No config in KVS found under key:", key);
       } else if (error) {
-        print("KVS Get Error:", JSON.stringify(error));
+        console.log("KVS Get Error:", JSON.stringify(error));
         callback(null);
       } else {
         callback(result.value);
@@ -767,8 +702,6 @@ function kvsGet(key, callback) {
     }
   );
 }
-
-
 
 /**
  * Loads data of devices to be processed from KVS to `CONFIG.allowed_devices`.\
@@ -791,10 +724,10 @@ function loadBleMacsFromKVS(callback) {
 
 loadBleMacsFromKVS(function () {
   if (Object.keys(CONFIG.allowed_devices).length == 0 && CONFIG.filter_devices) {
-    printDebug("No devices will be processed beucase filter_devices is true and allowed_devices are not set");
+    console.log("WARNING: No devices will be processed due to filter_devices=true and allowed_devices=empty");
   }
 
-  if (Object.keys(CONFIG.allowed_devices).length > 0 && CONFIG.debug) {
+  if (CONFIG.debug && Object.keys(CONFIG.allowed_devices).length > 0) {
     let msg = "Devices configured for processing:\n";
     for (let k in CONFIG.allowed_devices) {
       msg = msg + "\n" + "MAC: " + k
@@ -802,6 +735,6 @@ loadBleMacsFromKVS(function () {
         + "; Model: " + (CONFIG.allowed_devices[k][1] === undefined ? "<none>" : CONFIG.allowed_devices[k][1]);
     }
 
-    printDebug(msg);
+    console.log(msg);
   }
 });
