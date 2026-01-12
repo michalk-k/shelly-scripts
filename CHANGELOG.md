@@ -1,11 +1,19 @@
 # Changelog
+## v4.2.0
+* `mqtt-discovery-self`
+  - refactored for memory footprint optimization. Saved about 2.5kB
+  - reDiscovery on Shelly configuration change limited to components being reported plus `sys` component for device name change
+  - added support for availability
+* `mqtt-discovery-scr-mon`
+  - added support for availability
+
 ## v4.1.1
 * added documentation for `mqtt-discovery-ble` script
 
 ## v4.1.0
 * `mqtt-discovery-self`
   - Removed `temperature:0` from default settings. Use `mqtt-periodic-pub` script for reporting other components than `wifi`.
-* `mqtt-discovery-src.mon`:
+* `mqtt-discovery-scr-mon`
   - added publishing to MQTT only if MQTT is connected.
   - added `data_topic` setting
 * moved manifest file into scripts/ subdirectory to avoid prefixing script names with `scripts/` after import to a Shelly;

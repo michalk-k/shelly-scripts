@@ -21,127 +21,36 @@ let CONFIG = {
 };
 
 const COMPONENT_TYPES = ["switch", "pm1", "wifi", "em", "em1", "emdata", "em1data", "temperature", "cover", "humidity", "voltmeter", "input"];
-const SUPPORTED_ATTRS = ["apower", "aprt_power", "voltage", "freq", "current", "pf", "aenergy", "ret_aenergy", "output", "rssi", "temperature", "tC", "tF", "state", "state-cover", "rh", "xvoltage", "percent", "xpercent"];
 
-const CAT_DIAGNOSTIC = ["rssi","temperature"];
-const DISABLED_ENTS = ["pf", "voltage", "freq", "current", "ret_aenergy", "xvoltage", "state"];
-
-const ALIASES = {
-  "a_current": "current",
-  "b_current": "current",
-  "c_current": "current",
-  "a_voltage": "voltage",
-  "b_voltage": "voltage",
-  "c_voltage": "voltage",
-  "a_freq": "freq",
-  "b_freq": "freq",
-  "c_freq": "freq",
-  "a_pf": "pf",
-  "b_pf": "pf",
-  "c_pf": "pf",
-  "act_power": "apower",
-  "a_act_power": "apower",
-  "b_act_power": "apower",
-  "c_act_power": "apower",
-  "total_act_power": "apower",
-  "a_aprt_power": "aprt_power",
-  "b_aprt_power": "aprt_power",
-  "c_aprt_power": "aprt_power",
-  "total_aprt_power": "aprt_power",
-  "total_act_energy": "aenergy",
-  "total_act_ret_energy": "ret_aenergy",
-  "a_total_act_energy": "aenergy",
-  "b_total_act_energy": "aenergy",
-  "c_total_act_energy": "aenergy",
-  "a_total_act_ret_energy": "ret_aenergy",
-  "b_total_act_ret_energy": "ret_aenergy",
-  "c_total_act_ret_energy": "ret_aenergy",
-  "total_act": "aenergy",
-  "total_act_ret": "ret_aenergy",
-  "tF": "temperature",
-  "tC": "temperature"
+// Optimized: combined metadata object (saves ~350 bytes overhead)
+// Format: d=devclass, n=name, u=unit, dm=domain, diag=diagnostic, dis=disabled, na=not supported attribute
+const META = {
+  apower: {d:"power",n:"Active Power",u:"W",dm:"sensor"},
+  aprt_power: {d:"apparent_power",n:"Aparent Power",u:"VA",dm:"sensor"},
+  voltage: {d:"voltage",n:"Voltage",u:"V",dm:"sensor",dis:1},
+  xvoltage: {d:null,n:"X-Voltage",u:null,dm:"sensor",dis:1},
+  freq: {d:"frequency",n:"Frequency",u:"Hz",dm:"sensor",dis:1},
+  current: {d:"current",n:"Current",u:"A",dm:"sensor",dis:1},
+  pf: {d:"power_factor",n:"Power Factor",u:null,dm:"sensor",dis:1},
+  aenergy: {d:"energy",n:"Active Energy",u:"Wh",dm:"sensor"},
+  ret_aenergy: {d:"energy",n:"Returned Active Energy",u:"Wh",dm:"sensor",dis:1},
+  temperature: {d:"temperature",n:"Temperature",u:null,dm:"sensor",diag:1},
+  rh: {d:"humidity",n:"Humidity",u:"%",dm:"sensor"},
+  switch: {d:"switch",n:"Switch",u:null,dm:"switch", na: 1},
+  rssi: {d:"signal_strength",n:"RSSI",u:"dBm",dm:"sensor",diag:1},
+  light: {d:"light",n:"Light",u:null,dm:"light", na: 1},
+  "state-cover": {d:null,n:"Cover",u:null,dm:"cover"},
+  state: {d:null,n:"BinaryIn",u:null,dm:"binary_sensor",dis:1},
+  percent: {d:null,n:"AnalogIn",u:null,dm:"sensor"},
+  xpercent: {d:null,n:"X-AnalogIn",u:null,dm:"sensor"},
+  output: {d:null,n:"Switch",u:null,dm:"switch"},
+  tC: {d:null,n:null,u:"°C",dm:"sensor"},
+  tF: {d:null,n:null,u:"°F",dm:"sensor"}
 }
 
-const DEVCLASSES = {
-  "apower": "power",
-  "aprt_power": "apparent_power",
-  "voltage": "voltage",
-  "xvoltage": null, // unknown, units given by Shelly configuration
-  "freq": "frequency",
-  "current": "current",
-  "pf": "power_factor",
-  "aenergy": "energy",
-  "ret_aenergy": "energy",
-  "temperature": "temperature",
-  "rh": "humidity",
-  "switch": "switch", // from docs: possible none, switch, outlet
-  "rssi": "signal_strength",
-  "light": "light",
-  "state": null,
-  "state-cover": null,
-  "percent": null,
-  "xpercent": null
-}
-
-const NAMES = {
-  "apower": "Active Power",
-  "aprt_power": "Aparent Power",
-  "voltage": "Voltage",
-  "xvoltage": "X-Voltage",
-  "freq": "Frequency",
-  "current": "Current",
-  "pf": "Power Factor",
-  "aenergy": "Active Energy",
-  "ret_aenergy": "Returned Active Energy",
-  "temperature": "Temperature",
-  "rh": "Humidity",
-  "output": "Switch",
-  "switch": "Switch",
-  "rssi": "RSSI",
-  "light": "Light",
-  "state-cover": "Cover",
-  "state": "BinaryIn",
-  "percent": "AnalogIn",
-  "xpercent": "X-AnalogIn"
-}
-
-const UNITS = {
-  "apower": "W",
-  "aprt_power": "VA",
-  "voltage": "V",
-  "freq": "Hz",
-  "current": "A",
-  "aenergy": "Wh",
-  "ret_aenergy": "Wh",
-  "tC": "°C",
-  "tF": "°F",
-  "rh": "%",
-  "rssi": "dBm",
-  "percent": "%"
-}
-
-const DOMAINS = {
-  "apower": "sensor",
-  "aprt_power": "sensor",
-  "voltage": "sensor",
-  "xvoltage": "sensor",
-  "freq": "sensor",
-  "current": "sensor",
-  "aenergy": "sensor",
-  "ret_aenergy": "sensor",
-  "tC": "sensor",
-  "tF": "sensor",
-  "state-cover": "cover",
-  "state": "binary_sensor",
-  "output": "switch",
-  "pf": "sensor",
-  "rssi": "sensor",
-  "temperature": "sensor",
-  "rh": "sensor",
-  "percent": "sensor",
-  "xpercent": "sensor"
-  // switch and light matches domain name, not here to save memory
-}
+function isDiagnostic(attr) { let m=META[attr]; return m&&m.diag===1; }
+function isDisabled(attr) { let m=META[attr]; return m&&m.dis===1; }
+function isSupportedAttr(attr) { let m=META[attr]; return m&&(m.na===undefined||m.na===false||m.na===0); }
 
 /**
  * Normalize MAC address removing : and - characters, and making the rest lowercase
@@ -155,30 +64,20 @@ function normalizeMacAddress(address) {
 /**
  * Function creates and returns a device data in format requierd by MQTT discovery.
  *
- * Device name is built from its mac address and model name.
- *
- * @param {Object} deviceInfo - object with device information, including:
- * @param {string} deviceInfo.app - Device application/model name (e.g., "Plus 1PM")
- * @param {string} deviceInfo.model - Device model identifier (e.g., "SHPLG-S")
- * @param {string} deviceInfo.ver - Firmware version (e.g., "1.0.0")
- * @param {number|string} deviceInfo.gen - Device generation (e.g., 2)
- * @param {string} deviceInfo.mac - MAC address (e.g., "B8:D6:XX:XX:XX:XX")
- * @param {string} [deviceInfo.name] - Optional user-defined device name
+ * @param {string} mac - MAC address (e.g., "B8:D6:XX:XX:XX:XX")
  * @returns {Object} The device object with the following structure:
  */
-function discoveryDevice(deviceInfo) {
-
-  const macaddress = normalizeMacAddress(CONFIG.fake_macaddress ? CONFIG.fake_macaddress : deviceInfo.mac);
+function discoveryDevice(mac) {
 
   let device = {};
-  device.name = deviceInfo.name && CONFIG.custom_names.device ? deviceInfo.name : macaddress + "-" + deviceInfo.app;
-  device.ids = [macaddress + ""];
-  device.cns = [["mac", macaddress + ""]];
+  device.name = Shelly.getDeviceInfo().name && CONFIG.custom_names.device ? Shelly.getDeviceInfo().name : mac + "-" + Shelly.getDeviceInfo().app;
+  device.ids = [mac + ""];
+  device.cns = [["mac", mac + ""]];
   device.mf = "Shelly"
-  device.mdl = "Shelly " + deviceInfo.app;
-  device.mdl_id = deviceInfo.model;
-  device.sw = deviceInfo.ver;
-  device.hw = "gen " + deviceInfo.gen;
+  device.mdl = "Shelly " + Shelly.getDeviceInfo().app;
+  device.mdl_id = Shelly.getDeviceInfo().model;
+  device.sw = Shelly.getDeviceInfo().ver;
+  device.hw = "gen " + Shelly.getDeviceInfo().gen;
 
   if (CONFIG.report_ip) {
     device.cu = "http://" + Shelly.getComponentStatus("wifi").sta_ip;
@@ -189,14 +88,14 @@ function discoveryDevice(deviceInfo) {
 
 /**
   * Returns a template for value extraction from MQTT message.
-  * The template is based on the attribute type and its device class.
+  * The template is based on the attribute type.
   *
-  * @param {object} info - attribute name for which the template is to be created
+  * @param {object} info - Object containing information about the entity
   * @returns {string} - template string for extracting value from MQTT message
   */
 function getValTpl(info) {
 
-  if (info.attr == "aenergy") return "{{ value_json." + info.attr + ".total }}";
+  if (info.attr == "aenergy" || info.attr == "ret_aenergy") return "{{ value_json." + info.attr + ".total }}";
   if (info.attr == "output") return "{{ 'on' if value_json.output else 'off' }}";
   if (info.attr == "temperature") return "{{ value_json." + info.attr + ".t" + CONFIG.temperature_unit + " }}";
   if (info.attr == "state") return "{{ value_json." + info.attr + " if value_json." + info.attr + " else false }}";
@@ -206,7 +105,7 @@ function getValTpl(info) {
 
 /**
  * Generates a unique identifier for the entity based on its MAC address, attribute, and index.
- * The identifier is formatted as "mac_address_attribute_index", where attribute is Shelly component name, and index is optional.
+ * The identifier is formatted as "<macaddress>_<component>_<attribute>", where attribute is Shelly component name, component is instance of the component, ie switch1.
  * This way it never change even if you configure switch to be the light.
  * @param {object} info - Object containing information about the entity, including its MAC address, topic, and attribute
  * @returns {string} - Unique identifier for the entity
@@ -216,7 +115,7 @@ function getUniqueId(info) {
 }
 
 /**
- * Returns the unit of measurement for the given attribute.
+ * Returns the unit of measurement for entity.
  * If the attribute is temperature, it appends the configured temperature unit (C or F).
  * If the attribute is not recognized, it returns null.
  * @param {object} info - Object with data
@@ -234,15 +133,15 @@ function getUnits(info) {
   let attr = info.attr_common;
 
   if (info.attr_common == "temperature") attr = "t" + CONFIG.temperature_unit;
-  if (UNITS[attr] === undefined) return null;
+  if (META[attr] && META[attr].u) return META[attr].u;
 
-  return UNITS[attr];
+  return null;
 }
 
 /**
-  * Returns a human-readable name for the entity based on its attribute and index.
-  * Determines a user-friendly name for the entity based on its type and available information.
-  * @param {Object} info - Object containing information about the entity, including its attribute, index, and name.
+  * Returns a name for the entity based on its various attributes.
+  * In HA determines a user-friendly name as well as entity_id.
+  * @param {Object} info - Object containing information about the entity
   * @returns {string} - Human-readable name for the entity
   */
 function getName(info) {
@@ -250,7 +149,7 @@ function getName(info) {
   let name;
   let key = info.attr_common;
 
-  if (NAMES[info.attr_common]) name = NAMES[info.attr_common];
+  if (META[info.attr_common] && META[info.attr_common].n) name = META[info.attr_common].n;
   else name = info.attr_common;
 
   if (info.name) name = info.name + " " + name;
@@ -267,12 +166,24 @@ function getName(info) {
  *
  * @param {string} comp - Shelly component name
  * @param {string} attr - Attribute name to be translated
- * @returns {string} The value of the specified common attribute.
+ * @returns {string} The common attribute.
  */
 function getCommonAttr(comp, attr) {
   if (attr == "state" && comp == "cover") return "state-cover";
-  if (ALIASES[attr] === undefined) return attr;
-  return ALIASES[attr];
+
+  if (attr==="tF"||attr==="tC") return "temperature";
+  if (attr === "total_act") return "aenergy";
+  if (attr === "total_act_ret") return "ret_energy";
+  if (attr.indexOf("_current") != -1) return "current";
+  if (attr.indexOf("_voltage") != -1) return "voltage";
+  if (attr.indexOf("_freq") != -1) return "freq";
+  if (attr.indexOf("_pf") != -1) return "pf";
+  if (attr.indexOf("_act_power") != -1) return "apower";
+  if (attr.indexOf("_aprt_power") != -1) return "aprt_power";
+  if (attr.indexOf("_act_energy") != -1) return "aenergy";
+  if (attr.indexOf("_ret_energy") != -1) return "ret_energy";
+
+  return attr;
 }
 
 /**
@@ -280,11 +191,11 @@ function getCommonAttr(comp, attr) {
  * If the attribute is not recognized, it returns the attribute name itself.
  * This is used to determine how the entity should be represented in Home Assistant.
  * @param {string} attr - Attribute name for which the device class is to be retrieved
- * @returns {string} - Device class for the attribute, or the attribute name if not recognized
+ * @returns {string} - Device class for the attribute (can be null), or the attribute name if not recognized
  */
 function getDeviceClass(attr) {
-  if (DEVCLASSES[attr] === undefined) return attr;
-  return DEVCLASSES[attr];
+  if (META[attr] && META[attr].d !== undefined) return META[attr].d;
+  return attr;
 }
 
 /**
@@ -295,7 +206,7 @@ function getDeviceClass(attr) {
   * @returns {string} - Domain for the attribute, or the attribute name if not recognized
   */
 function getDomain(info) {
-  if (DOMAINS[info.attr_common] !== undefined) return DOMAINS[info.attr_common];
+  if (META[info.attr_common] && META[info.attr_common].dm) return META[info.attr_common].dm;
   return info.attr_common;
 }
 
@@ -314,6 +225,7 @@ function getDomain(info) {
  * @returns {Object} Object with data for publishing to MQTT
  */
 function discoveryEntity(topic, info) {
+
   let attr_orig = info.attr_common;
 
   if (info.attr == "output") {
@@ -327,6 +239,12 @@ function discoveryEntity(topic, info) {
   pload["name"] = getName(info);
   pload["uniq_id"] = getUniqueId(info);
   pload["stat_t"] = topic + "/status/" + info.topic;
+  pload["avty"] = {
+      "t": topic + "/online",
+      "pl_avail": "true",
+      "pl_not_avail": "false"
+    };
+
   pload[info.attr_common == "light" ? "stat_val_tpl" : "val_tpl"] = getValTpl(info);
   pload.dev_cla = getDeviceClass(info.attr_common);
 
@@ -384,14 +302,13 @@ function discoveryEntity(topic, info) {
      pload["sug_dsp_prc"] = 2;
   }
 
-  if (info.forcediagnostic || (!info.addon && CAT_DIAGNOSTIC.indexOf(info.attr_common) != -1)) {
+  if (info.forcediagnostic || (!info.addon && isDiagnostic(info.attr_common))) {
     pload["ent_cat"] = "diagnostic";
   }
 
-  if (info.forcedisabled || (!info.addon && CONFIG.disable_minor_entities && DISABLED_ENTS.indexOf(info.attr_common) != -1)) {
+  if (info.forcedisabled || (!info.addon && CONFIG.disable_minor_entities && isDisabled(info.attr_common))) {
     if (!info.forceenabled) pload["en"] = false;
   }
-
   return { "domain": domain, "subtopic": info.topic.split(":").join("") + "-" + info.attr, "data": pload }
 }
 
@@ -399,7 +316,6 @@ let report_arr = [];
 let comps = [];
 let report_arr_idx = 0;
 let comp_inst_num = {}; // number of components of the same type, ie switch:0, switch:1 etc
-let device;
 
 function initGlobals() {
   report_arr = [];
@@ -419,8 +335,7 @@ function precollect() {
   initGlobals();
   let status;
 
-  for (let t = 0; t < COMPONENT_TYPES.length; t++) {
-    let comptype = COMPONENT_TYPES[t];
+  for (let comptype of COMPONENT_TYPES) {
 
     // create data for single components
     status = Shelly.getComponentStatus(comptype);
@@ -428,9 +343,10 @@ function precollect() {
     if (status !== null) {
 
       for (let datattr in status) {
-        if (SUPPORTED_ATTRS.indexOf(getCommonAttr(comptype, datattr)) == -1) continue;
+        if (!isSupportedAttr(getCommonAttr(comptype, datattr))) continue;
         if (datattr == "tC" && CONFIG.temperature_unit != "C") continue;
         if (datattr == "tK" && CONFIG.temperature_unit != "K") continue;
+
         report_arr.push({comp : comptype, ix: -1, attr: datattr, topic: comptype});
       }
 
@@ -447,7 +363,7 @@ function precollect() {
         if (status === null) break;
 
         for (let datattr in status) {
-          if (SUPPORTED_ATTRS.indexOf(getCommonAttr(comptype, datattr)) == -1) continue;
+          if (!isSupportedAttr(getCommonAttr(comptype, datattr))) continue;
           if (datattr == "tC" && CONFIG.temperature_unit != "C") continue;
           if (datattr == "tF" && CONFIG.temperature_unit != "F") continue;
           report_arr.push({comp : comptype, ix: index, attr: datattr, topic: scomp});
@@ -474,7 +390,7 @@ function precollect() {
           if (status === null) break;
 
           for (let datattr in status) {
-            if (SUPPORTED_ATTRS.indexOf(getCommonAttr(comparr[0], datattr)) == -1) continue;
+            if (!isSupportedAttr(getCommonAttr(comparr[0], datattr))) continue;
             if (datattr == "tC" && CONFIG.temperature_unit != "C") continue;
             if (datattr == "tF" && CONFIG.temperature_unit != "F") continue;
             report_arr.push({comp : comparr[0], ix: comparr[1], attr: datattr, topic: scomp, addon: true});
@@ -523,26 +439,19 @@ function mqttDiscovery() {
     report_arr = null;
     report_arr_idx = 0;
     comp_inst_num = null;
-    device = null;
     isProcessing = false;
     return true;
   }
 
-  if (!device) {
-    device = discoveryDevice(Shelly.getDeviceInfo());
+  if (CONFIG.custom_names.channels && !info.addons || CONFIG.custom_names.addon && info.addons && Shelly.getComponentConfig(info.topic).name.length > 0) {
+    info.name = Shelly.getComponentConfig(info.topic).name;
   }
 
-  const compconfig = Shelly.getComponentConfig(info.topic);
-
-  if (CONFIG.custom_names.channels && !info.addons || CONFIG.custom_names.addon && info.addons && compconfig.name.length > 0) {
-    info.name = compconfig.name;
-  }
-
-  info.mac = device.cns[0][1];
+  info.mac = normalizeMacAddress(CONFIG.fake_macaddress ? CONFIG.fake_macaddress : Shelly.getDeviceInfo().mac);
   info.attr_common = getCommonAttr(info.comp, info.attr);
   if (Shelly.getComponentConfig("sys").ui_data.consumption_types && Shelly.getComponentConfig("sys").ui_data.consumption_types[info.ix]) info.altdomain = Shelly.getComponentConfig("sys").ui_data.consumption_types[info.ix];
 
-  const cfg = compconfig["x" + info.attr_common];
+  const cfg = Shelly.getComponentConfig(info.topic)["x" + info.attr_common];
   if ((info.attr_common === "percent" || info.attr_common === "voltage") && cfg && cfg.expr) {
     info.forcediagnostic = true;
     info.forcedisabled = true;
@@ -556,7 +465,7 @@ function mqttDiscovery() {
   info.issingle = comp_inst_num[info.comp] == 1;
 
   let data = discoveryEntity(Shelly.getComponentConfig("mqtt").topic_prefix, info);
-  data.data.dev = device;
+  data.data.dev = discoveryDevice(info.mac);
 
   let doms;
 
@@ -589,9 +498,9 @@ let isProcessing = false;
 let processingPhase;
 
 /**
- *  Generate MQTT Discovery
- * Initial precollection of entities to be reported.
- * This will also set up a timer to publish one collected entity per per time-period.
+ * Initialize discovery process.
+ * Starts with precollection of source data,
+ * then set up a timer to publish one collected entity per time-period.
  * @returns
  */
 function onMQTTConnected() {
@@ -629,10 +538,9 @@ function reportingWorker() {
  */
 function reportWifiToMQTT() {
   if (isProcessing) return;
-  let components = CONFIG.components_refresh;
 
-  for (let t = 0; t < components.length; t++) {
-    mqttPublishComponentData(components[t]);
+  for (let comp of CONFIG.components_refresh) {
+    mqttPublishComponentData(comp);
   }
 }
 
@@ -655,7 +563,9 @@ Shelly.addEventHandler(
     function (event) {
         // while we don't have better selectivity for event source
         if (typeof (event) === 'undefined') return;
-        if (event.info.event == "config_changed" && !event.info.restart_required) {
+        if (event.info.event == "config_changed" &&
+          !event.info.restart_required &&
+          (COMPONENT_TYPES.indexOf(event.name) !== -1 || event.name == 'sys')) {
           onMQTTConnected();
         }
     }
@@ -664,4 +574,3 @@ Shelly.addEventHandler(
 // Report Discovery on the script start
 mqttConnected = MQTT.isConnected();
 if (mqttConnected) onMQTTConnected();
-

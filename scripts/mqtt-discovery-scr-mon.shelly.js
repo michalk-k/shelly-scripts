@@ -74,6 +74,11 @@ function discoveryEntity(topic, mac) {
   pload["json_attributes_template"] = "{{ {'scripts': value_json.scripts, 'scripts_mem_free': value_json.scripts_mem_free } | tojson }}";
   pload["ent_cat"] = "diagnostic";
   pload["icon"] = "mdi:script-text-outline";
+  pload["avty"] = {
+      "t": topic + "/online",
+      "pl_avail": "true",
+      "pl_not_avail": "false"
+    };
 
   return { "domain": "sensor", "subtopic": "scripts_monitor", "data": pload }
 }
