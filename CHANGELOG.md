@@ -1,4 +1,8 @@
 # Changelog
+## v5.0.0
+* `deploy_script`
+  - added bash and PowerShell scripts
+
 ## v4.2.0
 * `mqtt-discovery-self`
   - refactored for memory footprint optimization. Saved about 2.5kB

@@ -21,6 +21,15 @@ This script republishes, at a configurable interval, the states of selected comp
 
 There are several methods how to install scripts.
 
+<details><summary><b>Use the utility</b></summary>
+
+---
+
+This repo offers deployment script available for bash or PowerShell. Use it to deploy any Shelly script to your device. See [tools](./tools) directory.
+
+---
+</details>
+
 <details><summary><b>Manual copy&paste</b></summary>
 
 ---
@@ -54,13 +63,3 @@ https://raw.githubusercontent.com/michalk-k/shelly-scripts/main/scripts/manifest
 ```
 ---
 </details>
-
-<details><summary><b>Use utility to upload</b></summary>
-
----
-
-I'm preparing an utility in form of bash and PowerShell scripts. The utility uploads a script from the any URL repository to shelly device on provided IP address.
-
----
-</details>
-
