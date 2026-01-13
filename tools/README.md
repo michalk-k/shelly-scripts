@@ -1,15 +1,36 @@
-This directory contain some tools helping with work with Shellies
+# Deploy script
 
-## deploy_script
+The script downloads a shelly script from any URL (ie GitHub) and uploads it to a Shelly device via RPC API.
 
-This is a script uploading a Shelly script directly to the Shelly device. The script is available for the `bash` and the `PowerShell`.
+**Features**
+* Bash and PowerShell version
+* chunked uploads, 
+* option to set autostart
+* option to run after upload
+* recognize already uploaded script by its name to overwrite it, if requested.
+* shows progress
 
-Usage:
+## Installation
+
+Download script from the repo:
+
+* Bash version: [click](./deploy_script.sh)
+* PowerShell version: [click](./deploy_script.ps1)
+
+## Usage
+
+`deploy_script -u <github_url> -h <device_ip> [-a] [-s] [-o]`
+
+*Parameters:*
+
 ```
-deploy_script.sh <github_url> <device_ip> <script_id> [autostart: true/false] [run_now: true/false]
+-u: URL (required)"
+-h: Device IP address (required)"
+-a: Enable autostart (flag)
+-s: Start after upload (flag)
+-o: Overwrite existing script (flag)
 ```
 
-Example:
-```
-./deploy_script.sh "https://raw.githubusercontent.com/michalk-k/shelly-scripts/master/scripts/mqtt-discovery-self.shelly.js" 192.168.1.50 1 true true
-```
+## Demo
+![Deploy script demo](../images/deploy_script.gif)
+

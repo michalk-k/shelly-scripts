@@ -59,7 +59,7 @@ https://raw.githubusercontent.com/michalk-k/shelly-scripts/main/scripts/manifest
 
 ---
 
-I'm preparing an utility in form of bash and PowerShell scripts. The utility uploads a script from the any URL repository to shelly device on provided IP address.
+This repo offers deployment script available for bash or PowerShell. Use it to deploy any Shelly script to your device. See [tools](./tools) directory.
 
 ---
 </details>
