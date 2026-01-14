@@ -42,10 +42,12 @@ check_rpc_error() {
 
 # --- Helper Function: Print Usage ---
 print_usage() {
-    echo "Usage: $0 (-u <github_url> | -f <local_file>) -h <device_ip> [-a] [-s] [-o]"
+    echo "Usage: $0 (-u <github_url> | -f <local_file>) -h <device_ip> [-U <username>] [-P <password>] [-a] [-s] [-o]"
     echo "  -u: GitHub URL (required if -f not specified)"
     echo "  -f: Local file path (required if -u not specified)"
     echo "  -h: Device IP address (required)"
+    echo "  -U: Username for device authentication (optional)"
+    echo "  -P: Password for device authentication (optional, requires -U)"
     echo "  -a: Enable autostart (flag)"
     echo "  -s: Start after upload (flag)"
     echo "  -o: Overwrite existing script (flag)"
@@ -55,11 +57,13 @@ print_usage() {
 GITHUB_URL=""
 LOCAL_FILE=""
 DEVICE_IP=""
+DEVICE_USER=""
+DEVICE_PASS=""
 AUTOSTART="false"
 RUN_NOW="false"
 OVERWRITE="false"
 
-while getopts "u:f:h:aso" opt; do
+while getopts "u:f:h:U:P:aso" opt; do
     case $opt in
         u)
             GITHUB_URL="$OPTARG"
@@ -69,6 +73,12 @@ while getopts "u:f:h:aso" opt; do
             ;;
         h)
             DEVICE_IP="$OPTARG"
+            ;;
+        U)
+            DEVICE_USER="$OPTARG"
+            ;;
+        P)
+            DEVICE_PASS="$OPTARG"
             ;;
         a)
             AUTOSTART="true"
@@ -110,6 +120,16 @@ if [ -n "$GITHUB_URL" ] && [ -n "$LOCAL_FILE" ]; then
     exit 1
 fi
 
+# Build curl authentication options if credentials are provided
+CURL_AUTH=""
+if [ -n "$DEVICE_USER" ]; then
+    if [ -n "$DEVICE_PASS" ]; then
+        CURL_AUTH="-u $DEVICE_USER:$DEVICE_PASS"
+    else
+        CURL_AUTH="-u $DEVICE_USER"
+    fi
+fi
+
 CHAR_LIMIT=1024  # Max characters per chunk
 
 # Determine script name from URL or file path
@@ -121,7 +141,7 @@ fi
 
 # 1. Check if script with the same name exists
 echo "--- Checking existing scripts ---"
-RESPONSE=$(curl -s -X GET "http://$DEVICE_IP/rpc/Script.List")
+RESPONSE=$(curl -s $CURL_AUTH -X GET "http://$DEVICE_IP/rpc/Script.List")
 check_rpc_error "$RESPONSE" "Retrieving script list"
 
 SCRIPT_ID=$(echo "$RESPONSE" | jq --arg name "$SCRIPT_NAME" '.scripts[] | select(.name == $name) | .id')
@@ -129,7 +149,7 @@ SCRIPT_ID=$(echo "$RESPONSE" | jq --arg name "$SCRIPT_NAME" '.scripts[] | select
 # 2. If not, create a new script slot with that name
 if [ -z "$SCRIPT_ID" ]; then
   echo "No existing script named '$SCRIPT_NAME' found. Creating new script slot..."
-  RESPONSE=$(curl -s -X GET "http://$DEVICE_IP/rpc/Script.Create?name=$SCRIPT_NAME")
+  RESPONSE=$(curl -s $CURL_AUTH -X GET "http://$DEVICE_IP/rpc/Script.Create?name=$SCRIPT_NAME")
   check_rpc_error "$RESPONSE" "Creating the script"
   SCRIPT_ID=$(echo "$RESPONSE" | jq '.id')
 
@@ -141,7 +161,7 @@ else
         exit 1
     fi
     echo "--- Stopping existing script ---"
-    RESPONSE=$(curl -s -X POST "http://$DEVICE_IP/rpc/Script.Stop" -d "{\"id\": $SCRIPT_ID}")
+    RESPONSE=$(curl -s $CURL_AUTH -X POST "http://$DEVICE_IP/rpc/Script.Stop" -d "{\"id\": $SCRIPT_ID}")
     check_rpc_error "$RESPONSE" "Stopping script at slot id: $SCRIPT_ID"
 fi
 
@@ -182,7 +202,7 @@ while [ $CURRENT_CHAR -lt $TOTAL_CHARS ]; do
     # Print progress in single line (overwrite previous line)
     printf "\rUploading: %d from %d (%d%%)" "$UPLOADED_CHARS" "$TOTAL_CHARS" "$PERCENTAGE"
 
-    RESPONSE=$(curl -s -X POST "http://$DEVICE_IP/rpc/Script.PutCode" \
+    RESPONSE=$(curl -s $CURL_AUTH -X POST "http://$DEVICE_IP/rpc/Script.PutCode" \
          -H "Content-Type: application/json; charset=utf-8" \
          -d "{
           \"id\": $SCRIPT_ID,
@@ -203,7 +223,7 @@ echo "Upload complete."
 # 5. Optionally set autostart
 if [ "$AUTOSTART" = "true" ]; then
     echo "--- Enabling Autostart ---"
-    RESPONSE=$(curl -s -X POST "http://$DEVICE_IP/rpc/Script.SetConfig" \
+    RESPONSE=$(curl -s $CURL_AUTH -X POST "http://$DEVICE_IP/rpc/Script.SetConfig" \
          -d "{\"id\": $SCRIPT_ID, \"config\": {\"enable\": true}}")
     check_rpc_error "$RESPONSE" "Setting Autostart"
 fi
@@ -211,11 +231,11 @@ fi
 # 6. Optionally run immediately
 if [ "$RUN_NOW" = "true" ]; then
     echo "--- Starting Script ---"
-    RESPONSE=$(curl -s -X POST "http://$DEVICE_IP/rpc/Script.Start" -d "{\"id\": $SCRIPT_ID}")
+    RESPONSE=$(curl -s $CURL_AUTH -X POST "http://$DEVICE_IP/rpc/Script.Start" -d "{\"id\": $SCRIPT_ID}")
     check_rpc_error "$RESPONSE" "Starting Script"
 
     sleep 2
-    RESPONSE=$(curl -s -X POST "http://$DEVICE_IP/rpc/Script.GetStatus" -d "{\"id\": $SCRIPT_ID}")
+    RESPONSE=$(curl -s $CURL_AUTH -X POST "http://$DEVICE_IP/rpc/Script.GetStatus" -d "{\"id\": $SCRIPT_ID}")
 
     check_rpc_error "$RESPONSE" "Script Status Check"
 fi

@@ -5,11 +5,11 @@ The script downloads a shelly script from any URL (ie GitHub) and uploads it to 
 **Features**
 * Bash and PowerShell version
 * upload from remote location or file
-* chunked uploads (needed by Shelly)
-* option to set autostart
-* option to run after upload
-* recognize already uploaded script by its name to overwrite it, if requested.
-* progress indicator
+* Supports Shelly device credentials
+* Chunked uploads (needed by Shelly)
+* Option to set the Autostart and Run after upload
+* Recognize already uploaded script by its name to overwrite it, if requested.
+* Progress indicator
 
 ## Installation
 
@@ -31,6 +31,8 @@ Download script from the repo:
 -a: Enable autostart (flag)
 -s: Start after upload (flag)
 -o: Overwrite existing script (flag). Script is recognized by its file name (incl. suffix)
+-U: Username for device authentication (optional)
+-P: Password for device authentication (optional, requires -U)
 ```
 
 ## Demo

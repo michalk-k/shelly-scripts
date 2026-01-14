@@ -44,10 +44,12 @@ function Check-RpcError {
 
 # --- Helper Function: Print Usage ---
 function Print-Usage {
-    Write-Host "Usage: $($MyInvocation.ScriptName) (-u <github_url> | -f <local_file>) -h <device_ip> [-a] [-s] [-o]"
+    Write-Host "Usage: $($MyInvocation.ScriptName) (-u <github_url> | -f <local_file>) -h <device_ip> [-U <username>] [-P <password>] [-a] [-s] [-o]"
     Write-Host "  -u: GitHub URL (required if -f not specified)"
     Write-Host "  -f: Local file path (required if -u not specified)"
     Write-Host "  -h: Device IP address (required)"
+    Write-Host "  -U: Username for device authentication (optional)"
+    Write-Host "  -P: Password for device authentication (optional, requires -U)"
     Write-Host "  -a: Enable autostart (flag)"
     Write-Host "  -s: Start after upload (flag)"
     Write-Host "  -o: Overwrite existing script (flag)"
@@ -57,6 +59,8 @@ function Print-Usage {
 $GITHUB_URL = ""
 $LOCAL_FILE = ""
 $DEVICE_IP = ""
+$DEVICE_USER = ""
+$DEVICE_PASS = ""
 $AUTOSTART = $false
 $RUN_NOW = $false
 $OVERWRITE = $false
@@ -92,6 +96,26 @@ while ($i -lt $params.Length) {
                 $i += 2
             } else {
                 Write-Host "Option -h requires an argument." -ForegroundColor Red
+                exit 1
+            }
+        }
+        "-U" {
+            if ($i + 1 -lt $params.Length) {
+                $DEVICE_USER = $params[$i + 1]
+                $i += 2
+            } else {
+                Write-Host "Option -U requires an argument." -ForegroundColor Red
+                Print-Usage
+                exit 1
+            }
+        }
+        "-P" {
+            if ($i + 1 -lt $params.Length) {
+                $DEVICE_PASS = $params[$i + 1]
+                $i += 2
+            } else {
+                Write-Host "Option -P requires an argument." -ForegroundColor Red
+                Print-Usage
                 exit 1
             }
         }
@@ -134,6 +158,18 @@ if (-not [string]::IsNullOrEmpty($GITHUB_URL) -and -not [string]::IsNullOrEmpty(
     exit 1
 }
 
+# Build PowerShell credential object if username is provided
+$DEVICE_CREDENTIAL = $null
+if (-not [string]::IsNullOrEmpty($DEVICE_USER)) {
+    if (-not [string]::IsNullOrEmpty($DEVICE_PASS)) {
+        $securePassword = ConvertTo-SecureString $DEVICE_PASS -AsPlainText -Force
+        $DEVICE_CREDENTIAL = New-Object System.Management.Automation.PSCredential($DEVICE_USER, $securePassword)
+    } else {
+        $securePassword = New-Object System.Security.SecureString
+        $DEVICE_CREDENTIAL = New-Object System.Management.Automation.PSCredential($DEVICE_USER, $securePassword)
+    }
+}
+
 $CHAR_LIMIT = 1024  # Max characters per chunk
 
 # Determine script name from URL or file path
@@ -146,7 +182,14 @@ if (-not [string]::IsNullOrEmpty($GITHUB_URL)) {
 # 1. Check if script with the same name exists
 Write-Host "--- Checking existing scripts ---" -ForegroundColor Cyan
 try {
-    $response = Invoke-RestMethod -Uri "http://$DEVICE_IP/rpc/Script.List" -Method Get
+    $invokeParams = @{
+        Uri = "http://$DEVICE_IP/rpc/Script.List"
+        Method = "Get"
+    }
+    if ($DEVICE_CREDENTIAL) {
+        $invokeParams["Credential"] = $DEVICE_CREDENTIAL
+    }
+    $response = Invoke-RestMethod @invokeParams
     Check-RpcError -JsonResponse $response -ActionName "Retrieving script list"
 } catch {
     Write-Host "Failed to retrieve script list: $($_.Exception.Message)" -ForegroundColor Red
@@ -165,7 +208,14 @@ if ($response.scripts) {
 if ($null -eq $SCRIPT_ID) {
     Write-Host "No existing script named '$SCRIPT_NAME' found. Creating new script slot..." -ForegroundColor Yellow
     try {
-        $response = Invoke-RestMethod -Uri "http://$DEVICE_IP/rpc/Script.Create?name=$SCRIPT_NAME" -Method Get
+        $invokeParams = @{
+            Uri = "http://$DEVICE_IP/rpc/Script.Create?name=$SCRIPT_NAME"
+            Method = "Get"
+        }
+        if ($DEVICE_CREDENTIAL) {
+            $invokeParams["Credential"] = $DEVICE_CREDENTIAL
+        }
+        $response = Invoke-RestMethod @invokeParams
         Check-RpcError -JsonResponse $response -ActionName "Creating the script"
         $SCRIPT_ID = $response.id
         Write-Host "Created new script with id: $SCRIPT_ID" -ForegroundColor Green
@@ -182,7 +232,16 @@ if ($null -eq $SCRIPT_ID) {
     Write-Host "--- Stopping existing script ---" -ForegroundColor Cyan
     try {
         $stopBody = @{ id = $SCRIPT_ID } | ConvertTo-Json -Compress
-        $response = Invoke-RestMethod -Uri "http://$DEVICE_IP/rpc/Script.Stop" -Method Post -Body $stopBody -ContentType "application/json"
+        $invokeParams = @{
+            Uri = "http://$DEVICE_IP/rpc/Script.Stop"
+            Method = "Post"
+            Body = $stopBody
+            ContentType = "application/json"
+        }
+        if ($DEVICE_CREDENTIAL) {
+            $invokeParams["Credential"] = $DEVICE_CREDENTIAL
+        }
+        $response = Invoke-RestMethod @invokeParams
         Check-RpcError -JsonResponse $response -ActionName "Stopping script at slot id: $SCRIPT_ID"
     } catch {
         Write-Host "Failed to stop script: $($_.Exception.Message)" -ForegroundColor Red
@@ -245,10 +304,16 @@ while ($CURRENT_CHAR -lt $TOTAL_CHARS) {
             append = $APPEND
         } | ConvertTo-Json -Compress
 
-        $response = Invoke-RestMethod -Uri "http://$DEVICE_IP/rpc/Script.PutCode" `
-                                     -Method Post `
-                                     -Body $putCodeBody `
-                                     -ContentType "application/json; charset=utf-8"
+        $invokeParams = @{
+            Uri = "http://$DEVICE_IP/rpc/Script.PutCode"
+            Method = "Post"
+            Body = $putCodeBody
+            ContentType = "application/json; charset=utf-8"
+        }
+        if ($DEVICE_CREDENTIAL) {
+            $invokeParams["Credential"] = $DEVICE_CREDENTIAL
+        }
+        $response = Invoke-RestMethod @invokeParams
 
         Check-RpcError -JsonResponse $response -ActionName "Upload at char $CURRENT_CHAR"
     } catch {
@@ -274,10 +339,16 @@ if ($AUTOSTART) {
             config = @{ enable = $true }
         } | ConvertTo-Json -Compress
 
-        $response = Invoke-RestMethod -Uri "http://$DEVICE_IP/rpc/Script.SetConfig" `
-                                     -Method Post `
-                                     -Body $configBody `
-                                     -ContentType "application/json"
+        $invokeParams = @{
+            Uri = "http://$DEVICE_IP/rpc/Script.SetConfig"
+            Method = "Post"
+            Body = $configBody
+            ContentType = "application/json"
+        }
+        if ($DEVICE_CREDENTIAL) {
+            $invokeParams["Credential"] = $DEVICE_CREDENTIAL
+        }
+        $response = Invoke-RestMethod @invokeParams
         Check-RpcError -JsonResponse $response -ActionName "Setting Autostart"
     } catch {
         Write-Host "Failed to set autostart: $($_.Exception.Message)" -ForegroundColor Red
@@ -290,19 +361,31 @@ if ($RUN_NOW) {
     Write-Host "--- Starting Script ---" -ForegroundColor Cyan
     try {
         $startBody = @{ id = $SCRIPT_ID } | ConvertTo-Json -Compress
-        $response = Invoke-RestMethod -Uri "http://$DEVICE_IP/rpc/Script.Start" `
-                                     -Method Post `
-                                     -Body $startBody `
-                                     -ContentType "application/json"
+        $invokeParams = @{
+            Uri = "http://$DEVICE_IP/rpc/Script.Start"
+            Method = "Post"
+            Body = $startBody
+            ContentType = "application/json"
+        }
+        if ($DEVICE_CREDENTIAL) {
+            $invokeParams["Credential"] = $DEVICE_CREDENTIAL
+        }
+        $response = Invoke-RestMethod @invokeParams
         Check-RpcError -JsonResponse $response -ActionName "Starting Script"
 
         Start-Sleep -Seconds 2
 
         $statusBody = @{ id = $SCRIPT_ID } | ConvertTo-Json -Compress
-        $response = Invoke-RestMethod -Uri "http://$DEVICE_IP/rpc/Script.GetStatus" `
-                                     -Method Post `
-                                     -Body $statusBody `
-                                     -ContentType "application/json"
+        $invokeParams = @{
+            Uri = "http://$DEVICE_IP/rpc/Script.GetStatus"
+            Method = "Post"
+            Body = $statusBody
+            ContentType = "application/json"
+        }
+        if ($DEVICE_CREDENTIAL) {
+            $invokeParams["Credential"] = $DEVICE_CREDENTIAL
+        }
+        $response = Invoke-RestMethod @invokeParams
         Check-RpcError -JsonResponse $response -ActionName "Script Status Check"
     } catch {
         Write-Host "Failed to start script: $($_.Exception.Message)" -ForegroundColor Red
