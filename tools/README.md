@@ -20,17 +20,17 @@ Download script from the repo:
 
 ## Usage
 
-`deploy_script (-u <remote_url> | -f <local_file>) -h <device_ip> [-a] [-s] [-o]`
+`deploy_script (-u <remote_url> | -f <local_file>) -h <device_addr> [-a] [-s] [-o]`
 
 *Parameters:*
 
 ```
--u: Remote file URL (required if -f not specified)
+-u: Remote file URL (required if -f not specified). Note it has to point to **raw file**.
 -f: Local file path (required if -u not specified)
--h: Device IP address (required)
+-h: Shelly device address (required)
 -a: Enable autostart (flag)
 -s: Start after upload (flag)
--o: Overwrite existing script (flag)
+-o: Overwrite existing script (flag). Script is recognized by its file name (incl. suffix)
 ```
 
 ## Demo

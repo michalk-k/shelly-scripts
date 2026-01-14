@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Deploy Script to Shelly Device
-# Downloads a script from remote location (ie GitHub or loads from local file and uploads it to a Shelly device via RPC API.
+# Downloads a script from remote location (ie GitHub) or loads from local file and uploads it to a Shelly device via RPC API.
 # Supports chunked uploads, autostart configuration, run after upload.
 # Recognizes already uploaded script by its name (incl. suffixes) to overwrite it, if requested.
 #
