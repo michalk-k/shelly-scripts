@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
 # Deploy Script to Shelly Device
-# Downloads a script from GitHub and uploads it to a Shelly device via RPC API.
+# Downloads a script from remote location (ie GitHub or loads from local file and uploads it to a Shelly device via RPC API.
 # Supports chunked uploads, autostart configuration, run after upload.
 # Recognizes already uploaded script by its name (incl. suffixes) to overwrite it, if requested.
 #
 # Author: Michal Bartak
-# Date: 2026-01-13
+# Date: 2026-01-14
 #
 
 # --- Helper Function: Check JSON for Errors ---
@@ -42,8 +42,9 @@ check_rpc_error() {
 
 # --- Helper Function: Print Usage ---
 print_usage() {
-    echo "Usage: $0 -u <github_url> -h <device_ip> [-a] [-s] [-o]"
-    echo "  -u: GitHub URL (required)"
+    echo "Usage: $0 (-u <github_url> | -f <local_file>) -h <device_ip> [-a] [-s] [-o]"
+    echo "  -u: GitHub URL (required if -f not specified)"
+    echo "  -f: Local file path (required if -u not specified)"
     echo "  -h: Device IP address (required)"
     echo "  -a: Enable autostart (flag)"
     echo "  -s: Start after upload (flag)"
@@ -52,15 +53,19 @@ print_usage() {
 
 # Parse command line arguments
 GITHUB_URL=""
+LOCAL_FILE=""
 DEVICE_IP=""
 AUTOSTART="false"
 RUN_NOW="false"
 OVERWRITE="false"
 
-while getopts "u:h:aso" opt; do
+while getopts "u:f:h:aso" opt; do
     case $opt in
         u)
             GITHUB_URL="$OPTARG"
+            ;;
+        f)
+            LOCAL_FILE="$OPTARG"
             ;;
         h)
             DEVICE_IP="$OPTARG"
@@ -87,14 +92,32 @@ while getopts "u:h:aso" opt; do
 done
 
 # Check for required arguments
-if [ -z "$GITHUB_URL" ] || [ -z "$DEVICE_IP" ]; then
-    echo "Error: -u (github_url) and -h (device_ip) are required arguments" >&2
+if [ -z "$DEVICE_IP" ]; then
+    echo "Error: -h (device_ip) is required" >&2
+    print_usage
+    exit 1
+fi
+
+if [ -z "$GITHUB_URL" ] && [ -z "$LOCAL_FILE" ]; then
+    echo "Error: Either -u (github_url) or -f (local_file) must be specified" >&2
+    print_usage
+    exit 1
+fi
+
+if [ -n "$GITHUB_URL" ] && [ -n "$LOCAL_FILE" ]; then
+    echo "Error: Cannot specify both -u and -f. Use either -u or -f." >&2
     print_usage
     exit 1
 fi
 
 CHAR_LIMIT=1024  # Max characters per chunk
-SCRIPT_NAME=$(basename "$GITHUB_URL")
+
+# Determine script name from URL or file path
+if [ -n "$GITHUB_URL" ]; then
+    SCRIPT_NAME=$(basename "$GITHUB_URL")
+elif [ -n "$LOCAL_FILE" ]; then
+    SCRIPT_NAME=$(basename "$LOCAL_FILE")
+fi
 
 # 1. Check if script with the same name exists
 echo "--- Checking existing scripts ---"
@@ -123,9 +146,18 @@ else
 fi
 
 
-# 3. Download source code to a temporary file
-echo "--- Downloading script from GitHub ---"
-SCRIPT_CONTENT=$(curl -sL "$GITHUB_URL") || exit 1
+# 3. Load source code from URL or local file
+if [ -n "$GITHUB_URL" ]; then
+    echo "--- Downloading script from GitHub ---"
+    SCRIPT_CONTENT=$(curl -sL "$GITHUB_URL") || exit 1
+elif [ -n "$LOCAL_FILE" ]; then
+    echo "--- Reading script from local file ---"
+    if [ ! -f "$LOCAL_FILE" ]; then
+        echo "Error: Local file '$LOCAL_FILE' does not exist" >&2
+        exit 1
+    fi
+    SCRIPT_CONTENT=$(cat "$LOCAL_FILE") || exit 1
+fi
 
 TOTAL_CHARS=${#SCRIPT_CONTENT}
 CURRENT_CHAR=0

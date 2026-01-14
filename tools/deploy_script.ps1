@@ -1,12 +1,12 @@
 #Requires -Version 5.1
 #
 # Deploy Script to Shelly Device
-# Downloads a script from GitHub and uploads it to a Shelly device via RPC API.
+# Downloads a script from remote location (ie GitHub) or loads from local file and uploads it to a Shelly device via RPC API.
 # Supports chunked uploads, autostart configuration, run after upload.
 # Recognizes already uploaded script by its name (incl. suffixes) to overwrite it, if requested.
 #
 # Author: Michal Bartak
-# Date: 2026-01-13
+# Date: 2026-01-14
 #
 
 # --- Helper Function: Check JSON for Errors ---
@@ -44,8 +44,9 @@ function Check-RpcError {
 
 # --- Helper Function: Print Usage ---
 function Print-Usage {
-    Write-Host "Usage: $($MyInvocation.ScriptName) -u <github_url> -h <device_ip> [-a] [-s] [-o]"
-    Write-Host "  -u: GitHub URL (required)"
+    Write-Host "Usage: $($MyInvocation.ScriptName) (-u <github_url> | -f <local_file>) -h <device_ip> [-a] [-s] [-o]"
+    Write-Host "  -u: GitHub URL (required if -f not specified)"
+    Write-Host "  -f: Local file path (required if -u not specified)"
     Write-Host "  -h: Device IP address (required)"
     Write-Host "  -a: Enable autostart (flag)"
     Write-Host "  -s: Start after upload (flag)"
@@ -54,6 +55,7 @@ function Print-Usage {
 
 # Parse command line arguments
 $GITHUB_URL = ""
+$LOCAL_FILE = ""
 $DEVICE_IP = ""
 $AUTOSTART = $false
 $RUN_NOW = $false
@@ -70,6 +72,16 @@ while ($i -lt $params.Length) {
                 $i += 2
             } else {
                 Write-Host "Option -u requires an argument." -ForegroundColor Red
+                Print-Usage
+                exit 1
+            }
+        }
+        "-f" {
+            if ($i + 1 -lt $params.Length) {
+                $LOCAL_FILE = $params[$i + 1]
+                $i += 2
+            } else {
+                Write-Host "Option -f requires an argument." -ForegroundColor Red
                 Print-Usage
                 exit 1
             }
@@ -104,14 +116,32 @@ while ($i -lt $params.Length) {
 }
 
 # Check for required arguments
-if ([string]::IsNullOrEmpty($GITHUB_URL) -or [string]::IsNullOrEmpty($DEVICE_IP)) {
-    Write-Host "Error: -u (github_url) and -h (device_ip) are required arguments" -ForegroundColor Red
+if ([string]::IsNullOrEmpty($DEVICE_IP)) {
+    Write-Host "Error: -h (device_ip) is required" -ForegroundColor Red
+    Print-Usage
+    exit 1
+}
+
+if ([string]::IsNullOrEmpty($GITHUB_URL) -and [string]::IsNullOrEmpty($LOCAL_FILE)) {
+    Write-Host "Error: Either -u (github_url) or -f (local_file) must be specified" -ForegroundColor Red
+    Print-Usage
+    exit 1
+}
+
+if (-not [string]::IsNullOrEmpty($GITHUB_URL) -and -not [string]::IsNullOrEmpty($LOCAL_FILE)) {
+    Write-Host "Error: Cannot specify both -u and -f. Use either -u or -f." -ForegroundColor Red
     Print-Usage
     exit 1
 }
 
 $CHAR_LIMIT = 1024  # Max characters per chunk
-$SCRIPT_NAME = [System.IO.Path]::GetFileName($GITHUB_URL)
+
+# Determine script name from URL or file path
+if (-not [string]::IsNullOrEmpty($GITHUB_URL)) {
+    $SCRIPT_NAME = [System.IO.Path]::GetFileName($GITHUB_URL)
+} elseif (-not [string]::IsNullOrEmpty($LOCAL_FILE)) {
+    $SCRIPT_NAME = [System.IO.Path]::GetFileName($LOCAL_FILE)
+}
 
 # 1. Check if script with the same name exists
 Write-Host "--- Checking existing scripts ---" -ForegroundColor Cyan
@@ -160,13 +190,27 @@ if ($null -eq $SCRIPT_ID) {
     }
 }
 
-# 3. Download source code to a temporary variable
-Write-Host "--- Downloading script from GitHub ---" -ForegroundColor Cyan
-try {
-    $SCRIPT_CONTENT = Invoke-RestMethod -Uri $GITHUB_URL -Method Get
-} catch {
-    Write-Host "Failed to download script from GitHub: $($_.Exception.Message)" -ForegroundColor Red
-    exit 1
+# 3. Load source code from URL or local file
+if (-not [string]::IsNullOrEmpty($GITHUB_URL)) {
+    Write-Host "--- Downloading script from GitHub ---" -ForegroundColor Cyan
+    try {
+        $SCRIPT_CONTENT = Invoke-RestMethod -Uri $GITHUB_URL -Method Get
+    } catch {
+        Write-Host "Failed to download script from GitHub: $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
+    }
+} elseif (-not [string]::IsNullOrEmpty($LOCAL_FILE)) {
+    Write-Host "--- Reading script from local file ---" -ForegroundColor Cyan
+    if (-not (Test-Path -Path $LOCAL_FILE -PathType Leaf)) {
+        Write-Host "Error: Local file '$LOCAL_FILE' does not exist" -ForegroundColor Red
+        exit 1
+    }
+    try {
+        $SCRIPT_CONTENT = Get-Content -Path $LOCAL_FILE -Raw
+    } catch {
+        Write-Host "Failed to read local file: $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
+    }
 }
 
 $TOTAL_CHARS = $SCRIPT_CONTENT.Length

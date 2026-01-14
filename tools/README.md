@@ -4,11 +4,12 @@ The script downloads a shelly script from any URL (ie GitHub) and uploads it to 
 
 **Features**
 * Bash and PowerShell version
-* chunked uploads, 
+* upload from remote location or file
+* chunked uploads (needed by Shelly)
 * option to set autostart
 * option to run after upload
 * recognize already uploaded script by its name to overwrite it, if requested.
-* shows progress
+* progress indicator
 
 ## Installation
 
@@ -19,13 +20,14 @@ Download script from the repo:
 
 ## Usage
 
-`deploy_script -u <github_url> -h <device_ip> [-a] [-s] [-o]`
+`deploy_script (-u <remote_url> | -f <local_file>) -h <device_ip> [-a] [-s] [-o]`
 
 *Parameters:*
 
 ```
--u: URL (required)"
--h: Device IP address (required)"
+-u: Remote file URL (required if -f not specified)
+-f: Local file path (required if -u not specified)
+-h: Device IP address (required)
 -a: Enable autostart (flag)
 -s: Start after upload (flag)
 -o: Overwrite existing script (flag)
@@ -33,4 +35,3 @@ Download script from the repo:
 
 ## Demo
 ![Deploy script demo](../images/deploy_script.gif)
-
