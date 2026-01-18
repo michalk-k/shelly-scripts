@@ -6,7 +6,7 @@
 # Recognizes already uploaded script by its name (incl. suffixes) to overwrite it, if requested.
 #
 # Author: Michal Bartak
-# Date: 2026-01-14
+# Date: 2026-01-18
 #
 
 # --- Helper Function: Check JSON for Errors ---
@@ -42,6 +42,125 @@ function Check-RpcError {
     }
 }
 
+# Manual Digest auth implementation using System.Security.Cryptography.SHA256 for hashing.
+# The Invoke-ShellyDigestAuth function handles the full challenge-response flow.
+# The function takes the following parameters:
+# - Uri: The URI of the API endpoint
+# - Username: The username for authentication
+# - Password: The password for authentication
+# - Method: The HTTP method to use (GET or POST)
+# - Body: The body of the request (optional)
+# The function returns the response from the API endpoint.
+function Invoke-ShellyDigestAuth {
+    param(
+        [string]$Uri,
+        [string]$Username,
+        [string]$Password,
+        [string]$Method = "GET",
+        [string]$Body = $null
+    )
+    
+    $fullUri = [System.Uri]$Uri
+    
+    # Step 1: Make initial request to get the WWW-Authenticate header
+    $request1 = [System.Net.WebRequest]::Create($Uri)
+    $request1.Method = $Method
+    
+    if ($Body) {
+        $request1.ContentType = "application/json"
+        $bodyBytes1 = [System.Text.Encoding]::UTF8.GetBytes($Body)
+        $request1.ContentLength = $bodyBytes1.Length
+        $reqStream1 = $request1.GetRequestStream()
+        $reqStream1.Write($bodyBytes1, 0, $bodyBytes1.Length)
+        $reqStream1.Close()
+    }
+    
+    try {
+        $response1 = $request1.GetResponse()
+        # If we get here without 401, auth not required
+        $stream = $response1.GetResponseStream()
+        $reader = New-Object System.IO.StreamReader($stream)
+        $content = $reader.ReadToEnd()
+        $reader.Close()
+        $response1.Close()
+        return $content
+    } catch [System.Net.WebException] {
+        $response1 = $_.Exception.Response
+        if ($response1.StatusCode -ne [System.Net.HttpStatusCode]::Unauthorized) {
+            throw
+        }
+        $wwwAuth = $response1.Headers["WWW-Authenticate"]
+        $response1.Close()
+    }
+    
+    # Step 2: Parse the WWW-Authenticate header
+    $realm = if ($wwwAuth -match 'realm="([^"]+)"') { $matches[1] } else { "" }
+    $nonce = if ($wwwAuth -match 'nonce="([^"]+)"') { $matches[1] } else { "" }
+    $qop = if ($wwwAuth -match 'qop="([^"]+)"') { $matches[1] } else { "" }
+    $algorithm = if ($wwwAuth -match 'algorithm=([^,\s]+)') { $matches[1] } else { "MD5" }
+    
+    # Step 3: Generate client nonce and nonce count
+    $cnonce = [System.Guid]::NewGuid().ToString("N").Substring(0, 16)
+    $nc = "00000001"
+    
+    # Step 4: Compute digest based on algorithm
+    function Get-Hash {
+        param([string]$Text, [string]$Alg)
+        
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($Text)
+        
+        if ($Alg -eq "SHA-256") {
+            $hasher = [System.Security.Cryptography.SHA256]::Create()
+        } else {
+            $hasher = [System.Security.Cryptography.MD5]::Create()
+        }
+        
+        $hash = $hasher.ComputeHash($bytes)
+        return ([System.BitConverter]::ToString($hash) -replace '-','').ToLower()
+    }
+    
+    $uriPath = $fullUri.PathAndQuery
+    
+    # HA1 = hash(username:realm:password)
+    $ha1 = Get-Hash -Text "${Username}:${realm}:${Password}" -Alg $algorithm
+    
+    # HA2 = hash(method:uri)
+    $ha2 = Get-Hash -Text "${Method}:${uriPath}" -Alg $algorithm
+    
+    # Response = hash(HA1:nonce:nc:cnonce:qop:HA2) for qop=auth
+    if ($qop -eq "auth") {
+        $responseHash = Get-Hash -Text "${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}" -Alg $algorithm
+    } else {
+        $responseHash = Get-Hash -Text "${ha1}:${nonce}:${ha2}" -Alg $algorithm
+    }
+    
+    # Step 5: Build Authorization header
+    $authHeader = "Digest username=`"$Username`", realm=`"$realm`", nonce=`"$nonce`", uri=`"$uriPath`", algorithm=$algorithm, response=`"$responseHash`", qop=$qop, nc=$nc, cnonce=`"$cnonce`""
+    
+    # Step 6: Make authenticated request
+    $request2 = [System.Net.WebRequest]::Create($Uri)
+    $request2.Method = $Method
+    $request2.Headers.Add("Authorization", $authHeader)
+    
+    if ($Body) {
+        $request2.ContentType = "application/json"
+        $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($Body)
+        $request2.ContentLength = $bodyBytes.Length
+        $reqStream = $request2.GetRequestStream()
+        $reqStream.Write($bodyBytes, 0, $bodyBytes.Length)
+        $reqStream.Close()
+    }
+    
+    $response2 = $request2.GetResponse()
+    $stream = $response2.GetResponseStream()
+    $reader = New-Object System.IO.StreamReader($stream)
+    $content = $reader.ReadToEnd()
+    $reader.Close()
+    $response2.Close()
+    
+    return $content
+}
+
 # --- Helper Function: Print Usage ---
 function Print-Usage {
     Write-Host "Usage: $($MyInvocation.ScriptName) (-u <github_url> | -f <local_file>) -h <device_ip> [-U <username>] [-P <password>] [-a] [-s] [-o]"
@@ -69,7 +188,7 @@ $OVERWRITE = $false
 $params = $args
 $i = 0
 while ($i -lt $params.Length) {
-    switch ($params[$i]) {
+    switch -CaseSensitive ($params[$i]) {
         "-u" {
             if ($i + 1 -lt $params.Length) {
                 $GITHUB_URL = $params[$i + 1]
@@ -158,18 +277,6 @@ if (-not [string]::IsNullOrEmpty($GITHUB_URL) -and -not [string]::IsNullOrEmpty(
     exit 1
 }
 
-# Build PowerShell credential object if username is provided
-$DEVICE_CREDENTIAL = $null
-if (-not [string]::IsNullOrEmpty($DEVICE_USER)) {
-    if (-not [string]::IsNullOrEmpty($DEVICE_PASS)) {
-        $securePassword = ConvertTo-SecureString $DEVICE_PASS -AsPlainText -Force
-        $DEVICE_CREDENTIAL = New-Object System.Management.Automation.PSCredential($DEVICE_USER, $securePassword)
-    } else {
-        $securePassword = New-Object System.Security.SecureString
-        $DEVICE_CREDENTIAL = New-Object System.Management.Automation.PSCredential($DEVICE_USER, $securePassword)
-    }
-}
-
 $CHAR_LIMIT = 1024  # Max characters per chunk
 
 # Determine script name from URL or file path
@@ -182,14 +289,8 @@ if (-not [string]::IsNullOrEmpty($GITHUB_URL)) {
 # 1. Check if script with the same name exists
 Write-Host "--- Checking existing scripts ---" -ForegroundColor Cyan
 try {
-    $invokeParams = @{
-        Uri = "http://$DEVICE_IP/rpc/Script.List"
-        Method = "Get"
-    }
-    if ($DEVICE_CREDENTIAL) {
-        $invokeParams["Credential"] = $DEVICE_CREDENTIAL
-    }
-    $response = Invoke-RestMethod @invokeParams
+    $responseText = Invoke-ShellyDigestAuth -Uri "http://$DEVICE_IP/rpc/Script.List" -Username $DEVICE_USER -Password $DEVICE_PASS -Method "GET"
+    $response = $responseText | ConvertFrom-Json
     Check-RpcError -JsonResponse $response -ActionName "Retrieving script list"
 } catch {
     Write-Host "Failed to retrieve script list: $($_.Exception.Message)" -ForegroundColor Red
@@ -208,14 +309,8 @@ if ($response.scripts) {
 if ($null -eq $SCRIPT_ID) {
     Write-Host "No existing script named '$SCRIPT_NAME' found. Creating new script slot..." -ForegroundColor Yellow
     try {
-        $invokeParams = @{
-            Uri = "http://$DEVICE_IP/rpc/Script.Create?name=$SCRIPT_NAME"
-            Method = "Get"
-        }
-        if ($DEVICE_CREDENTIAL) {
-            $invokeParams["Credential"] = $DEVICE_CREDENTIAL
-        }
-        $response = Invoke-RestMethod @invokeParams
+        $responseText = Invoke-ShellyDigestAuth -Uri "http://$DEVICE_IP/rpc/Script.Create?name=$SCRIPT_NAME" -Username $DEVICE_USER -Password $DEVICE_PASS -Method "GET"
+        $response = $responseText | ConvertFrom-Json
         Check-RpcError -JsonResponse $response -ActionName "Creating the script"
         $SCRIPT_ID = $response.id
         Write-Host "Created new script with id: $SCRIPT_ID" -ForegroundColor Green
@@ -229,24 +324,16 @@ if ($null -eq $SCRIPT_ID) {
         Write-Host "Use -o flag to overwrite the existing script" -ForegroundColor Yellow
         exit 1
     }
-    Write-Host "--- Stopping existing script ---" -ForegroundColor Cyan
-    try {
-        $stopBody = @{ id = $SCRIPT_ID } | ConvertTo-Json -Compress
-        $invokeParams = @{
-            Uri = "http://$DEVICE_IP/rpc/Script.Stop"
-            Method = "Post"
-            Body = $stopBody
-            ContentType = "application/json"
-        }
-        if ($DEVICE_CREDENTIAL) {
-            $invokeParams["Credential"] = $DEVICE_CREDENTIAL
-        }
-        $response = Invoke-RestMethod @invokeParams
-        Check-RpcError -JsonResponse $response -ActionName "Stopping script at slot id: $SCRIPT_ID"
-    } catch {
-        Write-Host "Failed to stop script: $($_.Exception.Message)" -ForegroundColor Red
-        exit 1
-    }
+    # Write-Host "--- Stopping existing script ---" -ForegroundColor Cyan
+    # try {
+    #     $stopBody = @{ id = $SCRIPT_ID } | ConvertTo-Json -Compress
+    #     $responseText = Invoke-ShellyDigestAuth -Uri "http://$DEVICE_IP/rpc/Script.Stop" -Username $DEVICE_USER -Password $DEVICE_PASS -Method "POST" -Body $stopBody
+    #     $response = $responseText | ConvertFrom-Json
+    #     Check-RpcError -JsonResponse $response -ActionName "Stopping script at slot id: $SCRIPT_ID"
+    # } catch {
+    #     Write-Host "Failed to stop script: $($_.Exception.Message)" -ForegroundColor Red
+    #     exit 1
+    # }
 }
 
 # 3. Load source code from URL or local file
@@ -272,13 +359,11 @@ if (-not [string]::IsNullOrEmpty($GITHUB_URL)) {
     }
 }
 
-$TOTAL_CHARS = $SCRIPT_CONTENT.Length
-$CURRENT_CHAR = 0
-
 # 4. Upload in chunks
 Write-Host "--- Starting chunked upload to Shelly (script slot id: $SCRIPT_ID) ---" -ForegroundColor Cyan
 
-$OFFSET = 0
+$TOTAL_CHARS = $SCRIPT_CONTENT.Length
+$CURRENT_CHAR = 0
 $APPEND = $false
 
 while ($CURRENT_CHAR -lt $TOTAL_CHARS) {
@@ -304,16 +389,8 @@ while ($CURRENT_CHAR -lt $TOTAL_CHARS) {
             append = $APPEND
         } | ConvertTo-Json -Compress
 
-        $invokeParams = @{
-            Uri = "http://$DEVICE_IP/rpc/Script.PutCode"
-            Method = "Post"
-            Body = $putCodeBody
-            ContentType = "application/json; charset=utf-8"
-        }
-        if ($DEVICE_CREDENTIAL) {
-            $invokeParams["Credential"] = $DEVICE_CREDENTIAL
-        }
-        $response = Invoke-RestMethod @invokeParams
+        $responseText = Invoke-ShellyDigestAuth -Uri "http://$DEVICE_IP/rpc/Script.PutCode" -Username $DEVICE_USER -Password $DEVICE_PASS -Method "POST" -Body $putCodeBody
+        $response = $responseText | ConvertFrom-Json
 
         Check-RpcError -JsonResponse $response -ActionName "Upload at char $CURRENT_CHAR"
     } catch {
@@ -339,16 +416,8 @@ if ($AUTOSTART) {
             config = @{ enable = $true }
         } | ConvertTo-Json -Compress
 
-        $invokeParams = @{
-            Uri = "http://$DEVICE_IP/rpc/Script.SetConfig"
-            Method = "Post"
-            Body = $configBody
-            ContentType = "application/json"
-        }
-        if ($DEVICE_CREDENTIAL) {
-            $invokeParams["Credential"] = $DEVICE_CREDENTIAL
-        }
-        $response = Invoke-RestMethod @invokeParams
+        $responseText = Invoke-ShellyDigestAuth -Uri "http://$DEVICE_IP/rpc/Script.SetConfig" -Username $DEVICE_USER -Password $DEVICE_PASS -Method "POST" -Body $configBody
+        $response = $responseText | ConvertFrom-Json
         Check-RpcError -JsonResponse $response -ActionName "Setting Autostart"
     } catch {
         Write-Host "Failed to set autostart: $($_.Exception.Message)" -ForegroundColor Red
@@ -361,31 +430,15 @@ if ($RUN_NOW) {
     Write-Host "--- Starting Script ---" -ForegroundColor Cyan
     try {
         $startBody = @{ id = $SCRIPT_ID } | ConvertTo-Json -Compress
-        $invokeParams = @{
-            Uri = "http://$DEVICE_IP/rpc/Script.Start"
-            Method = "Post"
-            Body = $startBody
-            ContentType = "application/json"
-        }
-        if ($DEVICE_CREDENTIAL) {
-            $invokeParams["Credential"] = $DEVICE_CREDENTIAL
-        }
-        $response = Invoke-RestMethod @invokeParams
+        $responseText = Invoke-ShellyDigestAuth -Uri "http://$DEVICE_IP/rpc/Script.Start" -Username $DEVICE_USER -Password $DEVICE_PASS -Method "POST" -Body $startBody
+        $response = $responseText | ConvertFrom-Json
         Check-RpcError -JsonResponse $response -ActionName "Starting Script"
 
         Start-Sleep -Seconds 2
 
         $statusBody = @{ id = $SCRIPT_ID } | ConvertTo-Json -Compress
-        $invokeParams = @{
-            Uri = "http://$DEVICE_IP/rpc/Script.GetStatus"
-            Method = "Post"
-            Body = $statusBody
-            ContentType = "application/json"
-        }
-        if ($DEVICE_CREDENTIAL) {
-            $invokeParams["Credential"] = $DEVICE_CREDENTIAL
-        }
-        $response = Invoke-RestMethod @invokeParams
+        $responseText = Invoke-ShellyDigestAuth -Uri "http://$DEVICE_IP/rpc/Script.GetStatus" -Username $DEVICE_USER -Password $DEVICE_PASS -Method "POST" -Body $statusBody
+        $response = $responseText | ConvertFrom-Json
         Check-RpcError -JsonResponse $response -ActionName "Script Status Check"
     } catch {
         Write-Host "Failed to start script: $($_.Exception.Message)" -ForegroundColor Red
