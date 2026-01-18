@@ -1,12 +1,12 @@
 # Deploy script
 
-The script downloads a shelly script from any URL (ie GitHub) and uploads it to a Shelly device via RPC API.
+The script uploads any script to a Shelly device via RPC API. It can either upload local file or download the script from URL (ie GitHub).
 
 **Features**
 * Bash and PowerShell version
-* upload from remote location or file
-* Supports Shelly device credentials
-* Chunked uploads (needed by Shelly)
+* upload from remote location or local file
+* Supports Shelly device password
+* Chunked uploads (required by Shelly)
 * Option to set the Autostart and Run after upload
 * Recognize already uploaded script by its name to overwrite it, if requested.
 * Progress indicator
@@ -20,7 +20,7 @@ Download script from the repo:
 
 ## Usage
 
-`deploy_script (-u <remote_url> | -f <local_file>) -h <device_addr> [-a] [-s] [-o]`
+`deploy_script (-u <remote_url> | -f <local_file>) -h <device_addr> [-U <username>|admin] [-P <password>] [-a] [-s] [-o]`
 
 *Parameters:*
 
@@ -31,8 +31,8 @@ Download script from the repo:
 -a: Enable autostart (flag)
 -s: Start after upload (flag)
 -o: Overwrite existing script (flag). Script is recognized by its file name (incl. suffix)
--U: Username for device authentication (optional)
--P: Password for device authentication (optional, requires -U)
+-U: Username for device authentication (optional). Shelly devices accepts `admin` only. If -U is missing while `-P` is provided, the -U defaults to `admin`
+-P: Password for device authentication (optional).
 ```
 
 ## Demo

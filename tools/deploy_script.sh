@@ -6,7 +6,7 @@
 # Recognizes already uploaded script by its name (incl. suffixes) to overwrite it, if requested.
 #
 # Author: Michal Bartak
-# Date: 2026-01-14
+# Date: 2026-01-18
 #
 
 # --- Helper Function: Check JSON for Errors ---
@@ -46,8 +46,8 @@ print_usage() {
     echo "  -u: GitHub URL (required if -f not specified)"
     echo "  -f: Local file path (required if -u not specified)"
     echo "  -h: Device IP address (required)"
-    echo "  -U: Username for device authentication (optional)"
-    echo "  -P: Password for device authentication (optional, requires -U)"
+    echo "  -U: Username for device authentication (optional, defaults to 'admin' if -P is provided)"
+    echo "  -P: Password for device authentication (optional)"
     echo "  -a: Enable autostart (flag)"
     echo "  -s: Start after upload (flag)"
     echo "  -o: Overwrite existing script (flag)"
@@ -120,17 +120,19 @@ if [ -n "$GITHUB_URL" ] && [ -n "$LOCAL_FILE" ]; then
     exit 1
 fi
 
+if [ -n "$DEVICE_PASS" ] && [ -z "$DEVICE_USER" ]; then
+    DEVICE_USER="admin"
+fi
+
 # Build curl authentication options if credentials are provided
 CURL_AUTH=""
 if [ -n "$DEVICE_USER" ]; then
     if [ -n "$DEVICE_PASS" ]; then
-        CURL_AUTH="-u $DEVICE_USER:$DEVICE_PASS"
+        CURL_AUTH="--anyauth -u $DEVICE_USER:$DEVICE_PASS"
     else
-        CURL_AUTH="-u $DEVICE_USER"
+        CURL_AUTH="--anyauth -u $DEVICE_USER"
     fi
 fi
-
-CHAR_LIMIT=1024  # Max characters per chunk
 
 # Determine script name from URL or file path
 if [ -n "$GITHUB_URL" ]; then
@@ -145,6 +147,7 @@ RESPONSE=$(curl -s $CURL_AUTH -X GET "http://$DEVICE_IP/rpc/Script.List")
 check_rpc_error "$RESPONSE" "Retrieving script list"
 
 SCRIPT_ID=$(echo "$RESPONSE" | jq --arg name "$SCRIPT_NAME" '.scripts[] | select(.name == $name) | .id')
+SCRIPT_RUNNING=$(echo "$RESPONSE" | jq --arg name "$SCRIPT_NAME" '.scripts[] | select(.name == $name) | .running')
 
 # 2. If not, create a new script slot with that name
 if [ -z "$SCRIPT_ID" ]; then
@@ -160,9 +163,11 @@ else
         echo "Use -o flag to overwrite the existing script"
         exit 1
     fi
-    echo "--- Stopping existing script ---"
-    RESPONSE=$(curl -s $CURL_AUTH -X POST "http://$DEVICE_IP/rpc/Script.Stop" -d "{\"id\": $SCRIPT_ID}")
-    check_rpc_error "$RESPONSE" "Stopping script at slot id: $SCRIPT_ID"
+    if [ "$SCRIPT_RUNNING" = "true" ]; then
+        echo "--- Stopping existing script ---"
+        RESPONSE=$(curl -s $CURL_AUTH -X POST "http://$DEVICE_IP/rpc/Script.Stop" -d "{\"id\": $SCRIPT_ID}")
+        check_rpc_error "$RESPONSE" "Stopping script at slot id: $SCRIPT_ID"
+    fi
 fi
 
 
@@ -179,13 +184,12 @@ elif [ -n "$LOCAL_FILE" ]; then
     SCRIPT_CONTENT=$(cat "$LOCAL_FILE") || exit 1
 fi
 
-TOTAL_CHARS=${#SCRIPT_CONTENT}
-CURRENT_CHAR=0
-
 # 4. Upload in chunks
 echo "--- Starting chunked upload to Shelly (script slot id: $SCRIPT_ID) ---"
 
-OFFSET=0
+CHAR_LIMIT=1024  # Max characters per chunk
+TOTAL_CHARS=${#SCRIPT_CONTENT}
+CURRENT_CHAR=0
 APPEND="false"
 
 while [ $CURRENT_CHAR -lt $TOTAL_CHARS ]; do
