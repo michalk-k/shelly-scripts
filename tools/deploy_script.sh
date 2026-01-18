@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
 # Deploy Script to Shelly Device
-# Downloads a script from GitHub and uploads it to a Shelly device via RPC API.
+# Downloads a script from remote location (ie GitHub) or loads from local file and uploads it to a Shelly device via RPC API.
 # Supports chunked uploads, autostart configuration, run after upload.
 # Recognizes already uploaded script by its name (incl. suffixes) to overwrite it, if requested.
 #
 # Author: Michal Bartak
-# Date: 2026-01-13
+# Date: 2026-01-18
 #
 
 # --- Helper Function: Check JSON for Errors ---
@@ -42,9 +42,12 @@ check_rpc_error() {
 
 # --- Helper Function: Print Usage ---
 print_usage() {
-    echo "Usage: $0 -u <github_url> -h <device_ip> [-a] [-s] [-o]"
-    echo "  -u: GitHub URL (required)"
+    echo "Usage: $0 (-u <github_url> | -f <local_file>) -h <device_ip> [-U <username>] [-P <password>] [-a] [-s] [-o]"
+    echo "  -u: GitHub URL (required if -f not specified)"
+    echo "  -f: Local file path (required if -u not specified)"
     echo "  -h: Device IP address (required)"
+    echo "  -U: Username for device authentication (optional, defaults to 'admin' if -P is provided)"
+    echo "  -P: Password for device authentication (optional)"
     echo "  -a: Enable autostart (flag)"
     echo "  -s: Start after upload (flag)"
     echo "  -o: Overwrite existing script (flag)"
@@ -52,18 +55,30 @@ print_usage() {
 
 # Parse command line arguments
 GITHUB_URL=""
+LOCAL_FILE=""
 DEVICE_IP=""
+DEVICE_USER=""
+DEVICE_PASS=""
 AUTOSTART="false"
 RUN_NOW="false"
 OVERWRITE="false"
 
-while getopts "u:h:aso" opt; do
+while getopts "u:f:h:U:P:aso" opt; do
     case $opt in
         u)
             GITHUB_URL="$OPTARG"
             ;;
+        f)
+            LOCAL_FILE="$OPTARG"
+            ;;
         h)
             DEVICE_IP="$OPTARG"
+            ;;
+        U)
+            DEVICE_USER="$OPTARG"
+            ;;
+        P)
+            DEVICE_PASS="$OPTARG"
             ;;
         a)
             AUTOSTART="true"
@@ -87,26 +102,57 @@ while getopts "u:h:aso" opt; do
 done
 
 # Check for required arguments
-if [ -z "$GITHUB_URL" ] || [ -z "$DEVICE_IP" ]; then
-    echo "Error: -u (github_url) and -h (device_ip) are required arguments" >&2
+if [ -z "$DEVICE_IP" ]; then
+    echo "Error: -h (device_ip) is required" >&2
     print_usage
     exit 1
 fi
 
-CHAR_LIMIT=1024  # Max characters per chunk
-SCRIPT_NAME=$(basename "$GITHUB_URL")
+if [ -z "$GITHUB_URL" ] && [ -z "$LOCAL_FILE" ]; then
+    echo "Error: Either -u (github_url) or -f (local_file) must be specified" >&2
+    print_usage
+    exit 1
+fi
+
+if [ -n "$GITHUB_URL" ] && [ -n "$LOCAL_FILE" ]; then
+    echo "Error: Cannot specify both -u and -f. Use either -u or -f." >&2
+    print_usage
+    exit 1
+fi
+
+if [ -n "$DEVICE_PASS" ] && [ -z "$DEVICE_USER" ]; then
+    DEVICE_USER="admin"
+fi
+
+# Build curl authentication options if credentials are provided
+CURL_AUTH=""
+if [ -n "$DEVICE_USER" ]; then
+    if [ -n "$DEVICE_PASS" ]; then
+        CURL_AUTH="--anyauth -u $DEVICE_USER:$DEVICE_PASS"
+    else
+        CURL_AUTH="--anyauth -u $DEVICE_USER"
+    fi
+fi
+
+# Determine script name from URL or file path
+if [ -n "$GITHUB_URL" ]; then
+    SCRIPT_NAME=$(basename "$GITHUB_URL")
+elif [ -n "$LOCAL_FILE" ]; then
+    SCRIPT_NAME=$(basename "$LOCAL_FILE")
+fi
 
 # 1. Check if script with the same name exists
 echo "--- Checking existing scripts ---"
-RESPONSE=$(curl -s -X GET "http://$DEVICE_IP/rpc/Script.List")
+RESPONSE=$(curl -s $CURL_AUTH -X GET "http://$DEVICE_IP/rpc/Script.List")
 check_rpc_error "$RESPONSE" "Retrieving script list"
 
 SCRIPT_ID=$(echo "$RESPONSE" | jq --arg name "$SCRIPT_NAME" '.scripts[] | select(.name == $name) | .id')
+SCRIPT_RUNNING=$(echo "$RESPONSE" | jq --arg name "$SCRIPT_NAME" '.scripts[] | select(.name == $name) | .running')
 
 # 2. If not, create a new script slot with that name
 if [ -z "$SCRIPT_ID" ]; then
   echo "No existing script named '$SCRIPT_NAME' found. Creating new script slot..."
-  RESPONSE=$(curl -s -X GET "http://$DEVICE_IP/rpc/Script.Create?name=$SCRIPT_NAME")
+  RESPONSE=$(curl -s $CURL_AUTH -X GET "http://$DEVICE_IP/rpc/Script.Create?name=$SCRIPT_NAME")
   check_rpc_error "$RESPONSE" "Creating the script"
   SCRIPT_ID=$(echo "$RESPONSE" | jq '.id')
 
@@ -117,23 +163,33 @@ else
         echo "Use -o flag to overwrite the existing script"
         exit 1
     fi
-    echo "--- Stopping existing script ---"
-    RESPONSE=$(curl -s -X POST "http://$DEVICE_IP/rpc/Script.Stop" -d "{\"id\": $SCRIPT_ID}")
-    check_rpc_error "$RESPONSE" "Stopping script at slot id: $SCRIPT_ID"
+    if [ "$SCRIPT_RUNNING" = "true" ]; then
+        echo "--- Stopping existing script ---"
+        RESPONSE=$(curl -s $CURL_AUTH -X POST "http://$DEVICE_IP/rpc/Script.Stop" -d "{\"id\": $SCRIPT_ID}")
+        check_rpc_error "$RESPONSE" "Stopping script at slot id: $SCRIPT_ID"
+    fi
 fi
 
 
-# 3. Download source code to a temporary file
-echo "--- Downloading script from GitHub ---"
-SCRIPT_CONTENT=$(curl -sL "$GITHUB_URL") || exit 1
-
-TOTAL_CHARS=${#SCRIPT_CONTENT}
-CURRENT_CHAR=0
+# 3. Load source code from URL or local file
+if [ -n "$GITHUB_URL" ]; then
+    echo "--- Downloading script from GitHub ---"
+    SCRIPT_CONTENT=$(curl -sL "$GITHUB_URL") || exit 1
+elif [ -n "$LOCAL_FILE" ]; then
+    echo "--- Reading script from local file ---"
+    if [ ! -f "$LOCAL_FILE" ]; then
+        echo "Error: Local file '$LOCAL_FILE' does not exist" >&2
+        exit 1
+    fi
+    SCRIPT_CONTENT=$(cat "$LOCAL_FILE") || exit 1
+fi
 
 # 4. Upload in chunks
 echo "--- Starting chunked upload to Shelly (script slot id: $SCRIPT_ID) ---"
 
-OFFSET=0
+CHAR_LIMIT=1024  # Max characters per chunk
+TOTAL_CHARS=${#SCRIPT_CONTENT}
+CURRENT_CHAR=0
 APPEND="false"
 
 while [ $CURRENT_CHAR -lt $TOTAL_CHARS ]; do
@@ -150,7 +206,7 @@ while [ $CURRENT_CHAR -lt $TOTAL_CHARS ]; do
     # Print progress in single line (overwrite previous line)
     printf "\rUploading: %d from %d (%d%%)" "$UPLOADED_CHARS" "$TOTAL_CHARS" "$PERCENTAGE"
 
-    RESPONSE=$(curl -s -X POST "http://$DEVICE_IP/rpc/Script.PutCode" \
+    RESPONSE=$(curl -s $CURL_AUTH -X POST "http://$DEVICE_IP/rpc/Script.PutCode" \
          -H "Content-Type: application/json; charset=utf-8" \
          -d "{
           \"id\": $SCRIPT_ID,
@@ -171,7 +227,7 @@ echo "Upload complete."
 # 5. Optionally set autostart
 if [ "$AUTOSTART" = "true" ]; then
     echo "--- Enabling Autostart ---"
-    RESPONSE=$(curl -s -X POST "http://$DEVICE_IP/rpc/Script.SetConfig" \
+    RESPONSE=$(curl -s $CURL_AUTH -X POST "http://$DEVICE_IP/rpc/Script.SetConfig" \
          -d "{\"id\": $SCRIPT_ID, \"config\": {\"enable\": true}}")
     check_rpc_error "$RESPONSE" "Setting Autostart"
 fi
@@ -179,11 +235,11 @@ fi
 # 6. Optionally run immediately
 if [ "$RUN_NOW" = "true" ]; then
     echo "--- Starting Script ---"
-    RESPONSE=$(curl -s -X POST "http://$DEVICE_IP/rpc/Script.Start" -d "{\"id\": $SCRIPT_ID}")
+    RESPONSE=$(curl -s $CURL_AUTH -X POST "http://$DEVICE_IP/rpc/Script.Start" -d "{\"id\": $SCRIPT_ID}")
     check_rpc_error "$RESPONSE" "Starting Script"
 
     sleep 2
-    RESPONSE=$(curl -s -X POST "http://$DEVICE_IP/rpc/Script.GetStatus" -d "{\"id\": $SCRIPT_ID}")
+    RESPONSE=$(curl -s $CURL_AUTH -X POST "http://$DEVICE_IP/rpc/Script.GetStatus" -d "{\"id\": $SCRIPT_ID}")
 
     check_rpc_error "$RESPONSE" "Script Status Check"
 fi
